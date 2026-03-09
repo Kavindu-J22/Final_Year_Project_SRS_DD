@@ -1,0 +1,35 @@
+# ── Virtual Environment ───────────────────────────────────────────────────────
+venv/
+.venv/
+env/
+.env/
+
+# ── Python cache ──────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+
+# ── RSA Keys (CRITICAL – never commit private keys) ──────────────────────────
+*.pem
+*.key
+*.crt
+private_key.pem
+public_key.pem
+keys/
+
+# ── Environment / secrets ─────────────────────────────────────────────────────
+.env
+.env.local
+*.env
+
+# ── Logs & reports ────────────────────────────────────────────────────────────
+*.log
+logs/
+
+# ── OS / IDE ──────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

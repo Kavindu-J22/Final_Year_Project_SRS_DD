@@ -1,0 +1,17 @@
+# ── RSA Keys (root-level keys/ folder) ───────────────────────────────────────
+keys/
+*.pem
+*.key
+*.crt
+
+# ── Python cache (repo-wide catch-all) ───────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+
+# ── OS / IDE ──────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+

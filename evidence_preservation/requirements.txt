@@ -1,0 +1,8 @@
+boto3
+azure-monitor-query
+azure-identity
+google-cloud-logging
+cryptography
+requests
+python-dotenv
+asn1crypto

@@ -1,0 +1,53 @@
+version: '3.7'
+
+services:
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.17.0
+    container_name: forensic_es
+    environment:
+      - node.name=forensic_es
+      - cluster.name=forensic-cluster
+      - discovery.type=single-node
+      - bootstrap.memory_lock=true
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    ports:
+      - "9200:9200"
+    networks:
+      - forensic-net
+
+  logstash:
+    image: docker.elastic.co/logstash/logstash:7.17.0
+    container_name: forensic_logstash
+    volumes:
+      - ./logstash/pipeline:/usr/share/logstash/pipeline
+      - ../data/bots_v1_subset:/usr/share/logstash/data
+    ports:
+      - "5000:5000"
+      - "9600:9600"
+    environment:
+      LS_JAVA_OPTS: "-Xmx256m -Xms256m"
+    networks:
+      - forensic-net
+    depends_on:
+      - elasticsearch
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:7.17.0
+    container_name: forensic_kibana
+    ports:
+      - "5601:5601"
+    environment:
+      ELASTICSEARCH_URL: http://elasticsearch:9200
+      ELASTICSEARCH_HOSTS: '["http://elasticsearch:9200"]'
+    networks:
+      - forensic-net
+    depends_on:
+      - elasticsearch
+
+networks:
+  forensic-net:
+    driver: bridge

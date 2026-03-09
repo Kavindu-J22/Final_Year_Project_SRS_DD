@@ -1,0 +1,123 @@
+[
+    {
+        "eventVersion": "1.08",
+        "userIdentity": {
+            "type": "IAMUser",
+            "principalId": "AIDATESTUSER001",
+            "arn": "arn:aws:iam::123456789012:user/Alice",
+            "accountId": "123456789012",
+            "userName": "Alice"
+        },
+        "eventTime": "2023-10-26T10:00:00Z",
+        "eventSource": "signin.amazonaws.com",
+        "eventName": "ConsoleLogin",
+        "awsRegion": "us-east-1",
+        "sourceIPAddress": "192.168.1.10",
+        "userAgent": "Mozilla/5.0",
+        "requestParameters": null,
+        "responseElements": {
+            "ConsoleLogin": "Success"
+        }
+    },
+    {
+        "eventVersion": "1.08",
+        "userIdentity": {
+            "type": "IAMUser",
+            "principalId": "AIDATESTUSER002",
+            "arn": "arn:aws:iam::123456789012:user/Bob",
+            "accountId": "123456789012",
+            "userName": "Bob"
+        },
+        "eventTime": "2023-10-26T10:05:00Z",
+        "eventSource": "s3.amazonaws.com",
+        "eventName": "GetObject",
+        "awsRegion": "us-west-2",
+        "sourceIPAddress": "192.168.1.11",
+        "userAgent": "AWS-CLI/2.0",
+        "requestParameters": {
+            "bucketName": "sensitive-data",
+            "key": "passwords.txt"
+        },
+        "responseElements": null
+    },
+    {
+        "eventVersion": "1.08",
+        "userIdentity": {
+            "type": "Root",
+            "principalId": "123456789012",
+            "arn": "arn:aws:iam::123456789012:root",
+            "accountId": "123456789012",
+            "userName": "root"
+        },
+        "eventTime": "2023-10-26T10:15:00Z",
+        "eventSource": "cloudtrail.amazonaws.com",
+        "eventName": "StopLogging",
+        "awsRegion": "us-east-1",
+        "sourceIPAddress": "10.0.0.5",
+        "userAgent": "Boto3/1.17",
+        "requestParameters": {
+            "name": "main-trail"
+        },
+        "responseElements": null
+    },
+    {
+        "eventVersion": "1.08",
+        "userIdentity": {
+            "type": "IAMUser",
+            "principalId": "AIDATESTUSER003",
+            "arn": "arn:aws:iam::123456789012:user/Charlie",
+            "accountId": "123456789012",
+            "userName": "Charlie"
+        },
+        "eventTime": "2023-10-26T10:20:00Z",
+        "eventSource": "ec2.amazonaws.com",
+        "eventName": "RunInstances",
+        "awsRegion": "us-east-1",
+        "sourceIPAddress": "192.168.1.12",
+        "userAgent": "Mozilla/5.0",
+        "requestParameters": {
+            "instancesSet": {
+                "items": [
+                    {
+                        "imageId": "ami-12345678"
+                    }
+                ]
+            }
+        },
+        "responseElements": {
+            "requestId": "req-123",
+            "instancesSet": {
+                "items": [
+                    {
+                        "instanceId": "i-1234567890abcdef0"
+                    }
+                ]
+            }
+        }
+    },
+    {
+        "eventVersion": "1.08",
+        "userIdentity": {
+            "type": "IAMUser",
+            "principalId": "AIDATESTUSER001",
+            "arn": "arn:aws:iam::123456789012:user/Alice",
+            "accountId": "123456789012",
+            "userName": "Alice"
+        },
+        "eventTime": "2023-10-26T10:25:00Z",
+        "eventSource": "iam.amazonaws.com",
+        "eventName": "CreateUser",
+        "awsRegion": "us-east-1",
+        "sourceIPAddress": "192.168.1.10",
+        "userAgent": "Mozilla/5.0",
+        "requestParameters": {
+            "userName": "backdoor_user"
+        },
+        "responseElements": {
+            "user": {
+                "userName": "backdoor_user",
+                "userId": "AIDANEWUSER001"
+            }
+        }
+    }
+]

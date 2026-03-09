@@ -1,0 +1,78 @@
+/**
+ * api.js – Axios instance wired to the Express backend.
+ * JWT is stored in localStorage and injected on every request.
+ * On 401 the user is redirected to /login.
+ */
+import axios from 'axios';
+
+const API = axios.create({
+  baseURL: '/api',           // Next.js rewrites → http://localhost:5000/api
+  timeout: 30_000,
+  headers: { 'Content-Type': 'application/json' },
+});
+
+// ── Request interceptor: attach JWT ──────────────────────────────────────────
+API.interceptors.request.use((config) => {
+  if (typeof window !== 'undefined') {
+    const token = localStorage.getItem('cf_token');
+    if (token) config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
+// ── Response interceptor: handle 401 ────────────────────────────────────────
+API.interceptors.response.use(
+  (res) => res,
+  (err) => {
+    if (err.response?.status === 401 && typeof window !== 'undefined') {
+      localStorage.removeItem('cf_token');
+      localStorage.removeItem('cf_user');
+      window.location.href = '/login';
+    }
+    return Promise.reject(err);
+  }
+);
+
+// ── Auth ─────────────────────────────────────────────────────────────────────
+export const authAPI = {
+  login:    (body) => API.post('/auth/login',    body),
+  register: (body) => API.post('/auth/register', body),
+  me:       ()     => API.get('/auth/me'),
+};
+
+// ── Logs ─────────────────────────────────────────────────────────────────────
+export const logsAPI = {
+  getAll:  (params) => API.get('/logs',         { params }),
+  ingest:  (body)   => API.post('/logs/ingest', body),
+  analyze: (logs)   => API.post('/logs/analyze',{ logs }),
+  getById: (id)     => API.get(`/logs/${id}`),
+};
+
+// ── Incidents ─────────────────────────────────────────────────────────────────
+export const incidentsAPI = {
+  getAll:     (params)                => API.get('/incidents',               { params }),
+  correlate:  (events, windowMins)    => API.post('/incidents/correlate',    { events, timeWindowMinutes: windowMins }),
+  getML:      ()                      => API.get('/incidents/ml'),
+  setStatus:  (id, status)            => API.patch(`/incidents/${id}/status`, { status }),
+};
+
+// ── Forensics ─────────────────────────────────────────────────────────────────
+export const forensicsAPI = {
+  preserve:          (body) => API.post('/forensics/preserve',          body),
+  verify:            ()     => API.post('/forensics/verify'),
+  getChain:          ()     => API.get('/forensics/chain'),
+  getStats:          ()     => API.get('/forensics/stats'),
+  analyzeTimeline:   (logs) => API.post('/forensics/timeline/analyze',  { logs }),
+  getAnomalies:      ()     => API.get('/forensics/timeline/anomalies'),
+  analyzeIdentity:   (body) => API.post('/forensics/identity/analyze',  body),
+};
+
+// ── Dashboard ─────────────────────────────────────────────────────────────────
+export const dashboardAPI = {
+  getStats:   () => API.get('/dashboard/stats'),
+  getMlHealth:() => API.get('/dashboard/ml-health'),
+  getRecent:  () => API.get('/dashboard/recent'),
+};
+
+export default API;
+

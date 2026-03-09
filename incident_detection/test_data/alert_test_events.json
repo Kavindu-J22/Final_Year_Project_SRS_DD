@@ -1,0 +1,69 @@
+[
+    {
+        "event_id": "evt_1001",
+        "timestamp": "2023-11-01T08:00:00Z",
+        "source": "firewall",
+        "event_type": "NetworkConnection",
+        "src_ip": "192.168.1.50",
+        "dest_ip": "10.0.0.5",
+        "port": 80,
+        "action": "ALLOW",
+        "user": null
+    },
+    {
+        "event_id": "evt_1002",
+        "timestamp": "2023-11-01T08:05:00Z",
+        "source": "auth_server",
+        "event_type": "FailedLogin",
+        "src_ip": "192.168.1.50",
+        "dest_ip": "10.0.0.5",
+        "port": 22,
+        "action": "DENY",
+        "user": "admin"
+    },
+    {
+        "event_id": "evt_1003",
+        "timestamp": "2023-11-01T08:05:02Z",
+        "source": "auth_server",
+        "event_type": "FailedLogin",
+        "src_ip": "192.168.1.50",
+        "dest_ip": "10.0.0.5",
+        "port": 22,
+        "action": "DENY",
+        "user": "admin"
+    },
+    {
+        "event_id": "evt_1004",
+        "timestamp": "2023-11-01T08:05:05Z",
+        "source": "auth_server",
+        "event_type": "FailedLogin",
+        "src_ip": "192.168.1.50",
+        "dest_ip": "10.0.0.5",
+        "port": 22,
+        "action": "DENY",
+        "user": "admin"
+    },
+    {
+        "event_id": "evt_1005",
+        "timestamp": "2023-11-01T08:05:10Z",
+        "source": "auth_server",
+        "event_type": "SuccessfulLogin",
+        "src_ip": "192.168.1.50",
+        "dest_ip": "10.0.0.5",
+        "port": 22,
+        "action": "ALLOW",
+        "user": "admin"
+    },
+    {
+        "event_id": "evt_1006",
+        "timestamp": "2023-11-01T08:10:00Z",
+        "source": "endpoint_edr",
+        "event_type": "ProcessLaunch",
+        "src_ip": "10.0.0.5",
+        "dest_ip": null,
+        "port": null,
+        "action": "EXECUTE",
+        "user": "admin",
+        "details": "powershell.exe -enc BASE64MALWARE"
+    }
+]

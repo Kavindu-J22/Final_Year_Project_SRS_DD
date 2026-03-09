@@ -1,0 +1,1170 @@
+# ============================================================================
+# PRODUCTION-GRADE INCIDENT DETECTION RULEBASE
+# ============================================================================
+# Version: 2.0.0
+# Last Updated: 2024-12-21
+# 
+# This comprehensive rulebase covers real-world security incidents across:
+# - Authentication & Identity
+# - Privilege Escalation
+# - Network Security
+# - Data Security & Exfiltration
+# - Resource Manipulation
+# - Crypto Mining & Ransomware
+# - Insider Threats
+# - API Abuse
+# - Cloud-Specific Attacks (AWS, Azure, GCP)
+# - Defense Evasion
+# - Lateral Movement
+# - Persistence Mechanisms
+#
+# Severity Levels:
+#   CRITICAL - Immediate action required, active breach likely
+#   HIGH     - Significant risk, investigate within 1 hour
+#   MEDIUM   - Potential threat, investigate within 24 hours
+#   LOW      - Informational, review during normal operations
+#   INFO     - Audit/logging purposes only
+# ============================================================================
+
+metadata:
+  version: "2.0.0"
+  author: "W. L. C. A. Fernando (IT22033550)"
+  description: "Production-grade detection rules for cloud security monitoring"
+  total_rules: 75
+  total_patterns: 12
+
+# =============================================================================
+# AUTHENTICATION & IDENTITY ATTACKS
+# =============================================================================
+authentication_rules:
+
+  # --- Brute Force & Credential Attacks ---
+  - id: AUTH_FAILED_LOGIN_SINGLE
+    name: "Failed Login Attempt"
+    description: "Single failed login attempt detected"
+    severity: LOW
+    category: authentication
+    mitre_attack: T1110
+    event_types:
+      - ConsoleLogin
+      - SignInLogs
+      - Sign-in activity
+      - google.login.LoginService
+    condition:
+      status: failure
+
+  - id: AUTH_BRUTE_FORCE
+    name: "Brute Force Attack"
+    description: "Multiple failed login attempts indicating brute force attack"
+    severity: HIGH
+    category: authentication
+    mitre_attack: T1110.001
+    correlation:
+      event_type: failed_login
+      threshold: 5
+      window_minutes: 10
+      group_by: source_ip
+
+  - id: AUTH_CREDENTIAL_STUFFING
+    name: "Credential Stuffing Attack"
+    description: "Failed logins across multiple accounts from same IP"
+    severity: HIGH
+    category: authentication
+    mitre_attack: T1110.004
+    correlation:
+      event_type: failed_login
+      threshold: 10
+      window_minutes: 30
+      group_by: source_ip
+      distinct_accounts: true
+
+  - id: AUTH_PASSWORD_SPRAY
+    name: "Password Spray Attack"
+    description: "Single password attempted against many accounts"
+    severity: HIGH
+    category: authentication
+    mitre_attack: T1110.003
+    correlation:
+      event_type: failed_login
+      threshold: 20
+      window_minutes: 60
+      group_by: source_ip
+      single_attempt_per_account: true
+
+  - id: AUTH_SUCCESS_AFTER_FAILURES
+    name: "Successful Login After Brute Force"
+    description: "Successful login following multiple failures - potential breach"
+    severity: CRITICAL
+    category: authentication
+    mitre_attack: T1078
+    correlation:
+      sequence:
+        - event: failed_login
+          count: 3
+        - event: successful_login
+          count: 1
+      window_minutes: 15
+      group_by: source_ip
+
+  # --- Authentication Anomalies ---
+  - id: AUTH_ROOT_LOGIN
+    name: "Root/Admin Account Used"
+    description: "Root or administrator account was used for authentication"
+    severity: MEDIUM
+    category: authentication
+    mitre_attack: T1078.003
+    condition:
+      actor_type:
+        - root
+        - Root
+        - Administrator
+        - admin
+        - SYSTEM
+
+  - id: AUTH_SERVICE_ACCOUNT_LOGIN
+    name: "Service Account Interactive Login"
+    description: "Service account used for interactive console login"
+    severity: HIGH
+    category: authentication
+    mitre_attack: T1078.004
+    event_types:
+      - ConsoleLogin
+    condition:
+      actor_contains:
+        - "svc_"
+        - "service-"
+        - "@gserviceaccount.com"
+        - "-sa@"
+
+  - id: AUTH_IMPOSSIBLE_TRAVEL
+    name: "Impossible Travel Detected"
+    description: "Login from geographically distant location within impossible timeframe"
+    severity: CRITICAL
+    category: authentication
+    mitre_attack: T1078
+    correlation:
+      event_type: successful_login
+      check: geographic_distance
+      max_speed_kmh: 800
+      window_minutes: 60
+      group_by: actor_id
+
+  - id: AUTH_UNUSUAL_HOUR_LOGIN
+    name: "Off-Hours Login"
+    description: "Login outside normal business hours (midnight to 5 AM)"
+    severity: LOW
+    category: authentication
+    condition:
+      time_range:
+        start: "00:00"
+        end: "05:00"
+
+  - id: AUTH_NEW_DEVICE_LOGIN
+    name: "Login from New Device/Location"
+    description: "First time login from this device or geographic location"
+    severity: MEDIUM
+    category: authentication
+    correlation:
+      first_occurrence:
+        field: user_agent
+        for: actor_id
+        window_days: 90
+
+  - id: AUTH_MFA_DISABLED
+    name: "Multi-Factor Authentication Disabled"
+    description: "MFA was disabled for a user account"
+    severity: HIGH
+    category: authentication
+    mitre_attack: T1556.006
+    event_types:
+      - DeactivateMFADevice
+      - DeleteVirtualMFADevice
+      - microsoft.directory/users/strongAuthentication/delete
+      - admin.AdminService.unenrollUserFromMfa
+
+  - id: AUTH_MFA_BYPASS
+    name: "MFA Bypass Attempt"
+    description: "Attempt to bypass multi-factor authentication"
+    severity: CRITICAL
+    category: authentication
+    mitre_attack: T1111
+    event_types:
+      - Sign-in activity
+    condition:
+      contains:
+        - "MFA requirement not met"
+        - "Second factor verification failed"
+        - "deviceCompliance::complianceNotMet"
+
+  - id: AUTH_SESSION_HIJACK
+    name: "Potential Session Hijacking"
+    description: "Session token used from different IP than login"
+    severity: CRITICAL
+    category: authentication
+    mitre_attack: T1563
+    correlation:
+      session_ip_change: true
+      window_minutes: 30
+
+  - id: AUTH_OAUTH_TOKEN_THEFT
+    name: "OAuth Token Suspicious Usage"
+    description: "OAuth token used from unusual location or user agent"
+    severity: HIGH
+    category: authentication
+    mitre_attack: T1528
+    event_types:
+      - AssumeRoleWithWebIdentity
+      - GetFederationToken
+
+# =============================================================================
+# PRIVILEGE ESCALATION
+# =============================================================================
+privilege_rules:
+
+  # --- IAM Policy Modifications ---
+  - id: PRIV_ADMIN_POLICY_ATTACHED
+    name: "Administrator Policy Attached"
+    description: "Full administrator policy attached to user/role"
+    severity: CRITICAL
+    category: privilege_escalation
+    mitre_attack: T1098.001
+    event_types:
+      - AttachUserPolicy
+      - AttachRolePolicy
+      - AttachGroupPolicy
+      - PutUserPolicy
+      - PutRolePolicy
+      - PutGroupPolicy
+    condition:
+      contains:
+        - "AdministratorAccess"
+        - "PowerUserAccess"
+        - "IAMFullAccess"
+        - ":policy/Admin"
+        - "Contributor"
+        - "Owner"
+
+  - id: PRIV_INLINE_POLICY_STAR
+    name: "Overly Permissive Inline Policy"
+    description: "Inline policy with '*' resource or action created"
+    severity: HIGH
+    category: privilege_escalation
+    mitre_attack: T1098.001
+    event_types:
+      - PutUserPolicy
+      - PutRolePolicy
+      - PutGroupPolicy
+    condition:
+      contains:
+        - '"Action":"*"'
+        - '"Resource":"*"'
+        - '"Effect":"Allow"'
+
+  - id: PRIV_IAM_USER_CREATED
+    name: "New IAM User Created"
+    description: "New user account created in cloud environment"
+    severity: MEDIUM
+    category: privilege_escalation
+    mitre_attack: T1136.003
+    event_types:
+      - CreateUser
+      - CreateLoginProfile
+      - Microsoft.Authorization/users/write
+      - google.admin.AdminService.createUser
+      - CreateServiceAccount
+
+  - id: PRIV_ACCESS_KEY_CREATED
+    name: "New Access Key Created"
+    description: "New API access key created - potential persistence"
+    severity: HIGH
+    category: privilege_escalation
+    mitre_attack: T1098.001
+    event_types:
+      - CreateAccessKey
+      - Microsoft.KeyVault/vaults/secrets/write
+      - google.iam.admin.v1.CreateServiceAccountKey
+
+  - id: PRIV_ASSUME_ROLE_CROSS_ACCOUNT
+    name: "Cross-Account Role Assumption"
+    description: "Role assumed from external AWS account"
+    severity: MEDIUM
+    category: privilege_escalation
+    mitre_attack: T1550.001
+    event_types:
+      - AssumeRole
+      - AssumeRoleWithSAML
+      - AssumeRoleWithWebIdentity
+    condition:
+      cross_account: true
+
+  - id: PRIV_ROLE_TRUST_MODIFIED
+    name: "Role Trust Policy Modified"
+    description: "Role trust relationship was modified"
+    severity: HIGH
+    category: privilege_escalation
+    mitre_attack: T1484.002
+    event_types:
+      - UpdateAssumeRolePolicy
+      - CreateRole
+    condition:
+      contains:
+        - "arn:aws:iam::"
+        - "Principal"
+
+  - id: PRIV_STS_GETCALLERIDENTITY
+    name: "Credential Reconnaissance"
+    description: "GetCallerIdentity called - credential testing"
+    severity: LOW
+    category: reconnaissance
+    mitre_attack: T1087.004
+    event_types:
+      - GetCallerIdentity
+
+  - id: PRIV_PASSROLE_ABUSE
+    name: "PassRole Privilege Abuse"
+    description: "iam:PassRole used to escalate via service"
+    severity: HIGH
+    category: privilege_escalation
+    mitre_attack: T1548
+    event_types:
+      - PassRole
+    condition:
+      high_privilege_role: true
+
+# =============================================================================
+# NETWORK SECURITY
+# =============================================================================
+network_rules:
+
+  - id: NET_SECURITY_GROUP_OPEN_ALL
+    name: "Security Group Wide Open"
+    description: "Security group allows all traffic from 0.0.0.0/0"
+    severity: CRITICAL
+    category: network
+    mitre_attack: T1562.007
+    event_types:
+      - AuthorizeSecurityGroupIngress
+      - AuthorizeSecurityGroupEgress
+      - Microsoft.Network/networkSecurityGroups/write
+      - compute.firewalls.insert
+      - compute.firewalls.patch
+    condition:
+      contains:
+        - "0.0.0.0/0"
+        - "::/0"
+        - "IpProtocol': '-1"
+
+  - id: NET_SSH_EXPOSED
+    name: "SSH Exposed to Internet"
+    description: "Port 22 (SSH) opened to public internet"
+    severity: CRITICAL
+    category: network
+    mitre_attack: T1562.007
+    event_types:
+      - AuthorizeSecurityGroupIngress
+    condition:
+      port: 22
+      source: "0.0.0.0/0"
+
+  - id: NET_RDP_EXPOSED
+    name: "RDP Exposed to Internet"
+    description: "Port 3389 (RDP) opened to public internet"
+    severity: CRITICAL
+    category: network
+    mitre_attack: T1562.007
+    event_types:
+      - AuthorizeSecurityGroupIngress
+    condition:
+      port: 3389
+      source: "0.0.0.0/0"
+
+  - id: NET_DATABASE_EXPOSED
+    name: "Database Port Exposed"
+    description: "Database ports (3306, 5432, 1433, 27017) exposed to internet"
+    severity: CRITICAL
+    category: network
+    mitre_attack: T1190
+    event_types:
+      - AuthorizeSecurityGroupIngress
+    condition:
+      ports:
+        - 3306   # MySQL
+        - 5432   # PostgreSQL
+        - 1433   # MSSQL
+        - 27017  # MongoDB
+        - 6379   # Redis
+      source: "0.0.0.0/0"
+
+  - id: NET_VPC_PEERING_CREATED
+    name: "VPC Peering Connection Created"
+    description: "New VPC peering connection established"
+    severity: MEDIUM
+    category: network
+    event_types:
+      - CreateVpcPeeringConnection
+      - AcceptVpcPeeringConnection
+      - Microsoft.Network/virtualNetworkPeerings/write
+
+  - id: NET_VPN_GATEWAY_CREATED
+    name: "VPN Gateway Created"
+    description: "New VPN gateway created - potential exfil path"
+    severity: MEDIUM
+    category: network
+    event_types:
+      - CreateVpnGateway
+      - CreateCustomerGateway
+      - Microsoft.Network/vpnGateways/write
+
+  - id: NET_PUBLIC_IP_ASSIGNED
+    name: "Public IP Assigned to Instance"
+    description: "Public IP address assigned to compute instance"
+    severity: LOW
+    category: network
+    event_types:
+      - AssociateAddress
+      - AllocateAddress
+      - Microsoft.Network/publicIPAddresses/write
+
+  - id: NET_NAT_GATEWAY_DELETED
+    name: "NAT Gateway Deleted"
+    description: "NAT gateway deleted - may expose private instances"
+    severity: HIGH
+    category: network
+    event_types:
+      - DeleteNatGateway
+
+  - id: NET_FLOW_LOGS_DISABLED
+    name: "VPC Flow Logs Disabled"
+    description: "Network flow logging disabled - potential cover-up"
+    severity: HIGH
+    category: defense_evasion
+    mitre_attack: T1562.008
+    event_types:
+      - DeleteFlowLogs
+      - Microsoft.Network/networkWatchers/flowLogs/delete
+
+# =============================================================================
+# DATA SECURITY & EXFILTRATION
+# =============================================================================
+data_rules:
+
+  - id: DATA_BUCKET_PUBLIC
+    name: "Storage Bucket Made Public"
+    description: "Cloud storage bucket made publicly accessible"
+    severity: CRITICAL
+    category: data_exposure
+    mitre_attack: T1530
+    event_types:
+      - PutBucketAcl
+      - PutBucketPolicy
+      - PutObjectAcl
+      - PutBucketPublicAccessBlock
+      - Microsoft.Storage/storageAccounts/write
+      - storage.buckets.update
+      - storage.buckets.setIamPolicy
+    condition:
+      contains:
+        - "public-read"
+        - "public-read-write"
+        - "AllUsers"
+        - "allUsers"
+        - "allAuthenticatedUsers"
+        - "BlockPublicAcls': False"
+
+  - id: DATA_BUCKET_POLICY_STAR
+    name: "Bucket Policy Allows All"
+    description: "Bucket policy with Principal '*' created"
+    severity: CRITICAL
+    category: data_exposure
+    mitre_attack: T1530
+    event_types:
+      - PutBucketPolicy
+    condition:
+      contains:
+        - '"Principal":"*"'
+        - '"Principal": "*"'
+        - '"AWS":"*"'
+
+  - id: DATA_ENCRYPTION_DISABLED
+    name: "Storage Encryption Disabled"
+    description: "Encryption removed from storage resource"
+    severity: HIGH
+    category: data_exposure
+    mitre_attack: T1485
+    event_types:
+      - DeleteBucketEncryption
+      - PutBucketEncryption
+
+  - id: DATA_LARGE_DOWNLOAD
+    name: "Large Data Download"
+    description: "Unusually large data download detected"
+    severity: MEDIUM
+    category: data_exfiltration
+    mitre_attack: T1567
+    condition:
+      bytes_transferred_gt: 1073741824  # 1GB
+
+  - id: DATA_MASS_DOWNLOAD
+    name: "Mass Object Download"
+    description: "Large number of objects downloaded in short time"
+    severity: HIGH
+    category: data_exfiltration
+    mitre_attack: T1530
+    correlation:
+      event_type: GetObject
+      threshold: 100
+      window_minutes: 10
+      group_by: actor_id
+
+  - id: DATA_CROSS_REGION_COPY
+    name: "Cross-Region Data Copy"
+    description: "Data copied to different region - potential exfiltration"
+    severity: MEDIUM
+    category: data_exfiltration
+    mitre_attack: T1537
+    event_types:
+      - CopyObject
+      - ReplicateObject
+      - StartBucketReplication
+    condition:
+      cross_region: true
+
+  - id: DATA_EXTERNAL_SHARE
+    name: "Data Shared Externally"
+    description: "Data shared to external account or public"
+    severity: HIGH
+    category: data_exfiltration
+    mitre_attack: T1567.002
+    event_types:
+      - PutBucketAcl
+      - PutObjectAcl
+    condition:
+      external_principal: true
+
+  - id: DATA_DATABASE_SNAPSHOT_SHARED
+    name: "Database Snapshot Shared"
+    description: "Database snapshot shared with external account"
+    severity: HIGH
+    category: data_exfiltration
+    mitre_attack: T1537
+    event_types:
+      - ModifyDBSnapshotAttribute
+      - ModifyDBClusterSnapshotAttribute
+    condition:
+      contains:
+        - "add"
+        - "attributeValues"
+
+  - id: DATA_SECRETS_ACCESSED
+    name: "Secrets Manager Access"
+    description: "Sensitive secrets accessed from Secrets Manager"
+    severity: MEDIUM
+    category: credential_access
+    mitre_attack: T1555.006
+    event_types:
+      - GetSecretValue
+      - BatchGetSecretValue
+      - Microsoft.KeyVault/vaults/secrets/read
+      - secretmanager.versions.access
+
+  - id: DATA_PARAMETER_STORE_SECRETS
+    name: "Parameter Store Secrets Accessed"
+    description: "SecureString parameters accessed from SSM"
+    severity: MEDIUM
+    category: credential_access
+    mitre_attack: T1555.006
+    event_types:
+      - GetParameter
+      - GetParameters
+      - GetParametersByPath
+    condition:
+      contains:
+        - "SecureString"
+        - "WithDecryption"
+
+# =============================================================================
+# RESOURCE MANIPULATION
+# =============================================================================
+resource_rules:
+
+  - id: RES_EC2_TERMINATED
+    name: "EC2 Instance Terminated"
+    description: "Compute instance was terminated"
+    severity: MEDIUM
+    category: resource_manipulation
+    mitre_attack: T1485
+    event_types:
+      - TerminateInstances
+      - StopInstances
+      - Microsoft.Compute/virtualMachines/delete
+      - compute.instances.delete
+
+  - id: RES_DATABASE_DELETED
+    name: "Database Instance Deleted"
+    description: "Database instance was deleted"
+    severity: CRITICAL
+    category: resource_manipulation
+    mitre_attack: T1485
+    event_types:
+      - DeleteDBInstance
+      - DeleteDBCluster
+      - Microsoft.Sql/servers/databases/delete
+      - cloudsql.instances.delete
+      - Microsoft.DocumentDB/databaseAccounts/delete
+
+  - id: RES_BACKUP_DELETED
+    name: "Backup/Snapshot Deleted"
+    description: "Backup or snapshot was deleted"
+    severity: HIGH
+    category: resource_manipulation
+    mitre_attack: T1490
+    event_types:
+      - DeleteSnapshot
+      - DeleteDBSnapshot
+      - DeleteDBClusterSnapshot
+      - DeleteBackup
+      - Microsoft.RecoveryServices/vaults/backupFabrics/delete
+      - compute.snapshots.delete
+
+  - id: RES_AMI_MADE_PUBLIC
+    name: "Machine Image Made Public"
+    description: "AMI or VM image made publicly available"
+    severity: HIGH
+    category: data_exposure
+    mitre_attack: T1578.002
+    event_types:
+      - ModifyImageAttribute
+      - compute.images.setIamPolicy
+    condition:
+      contains:
+        - "LaunchPermission"
+        - "all"
+
+  - id: RES_LAMBDA_PUBLICLY_ACCESSIBLE
+    name: "Lambda Function Public"
+    description: "Lambda function made publicly invokable"
+    severity: HIGH
+    category: resource_manipulation
+    event_types:
+      - AddPermission
+      - AddLayerVersionPermission
+    condition:
+      contains:
+        - '"Principal":"*"'
+
+  - id: RES_MASS_DELETION
+    name: "Mass Resource Deletion"
+    description: "Multiple resources deleted in short timeframe"
+    severity: CRITICAL
+    category: resource_manipulation
+    mitre_attack: T1485
+    correlation:
+      event_pattern: "Delete*"
+      threshold: 10
+      window_minutes: 30
+      group_by: actor_id
+
+# =============================================================================
+# LOGGING & MONITORING EVASION
+# =============================================================================
+defense_evasion_rules:
+
+  - id: EVASION_CLOUDTRAIL_STOPPED
+    name: "CloudTrail Logging Stopped"
+    description: "CloudTrail logging was stopped - critical cover-up"
+    severity: CRITICAL
+    category: defense_evasion
+    mitre_attack: T1562.008
+    event_types:
+      - StopLogging
+      - DeleteTrail
+
+  - id: EVASION_CLOUDTRAIL_MODIFIED
+    name: "CloudTrail Configuration Modified"
+    description: "CloudTrail settings were modified"
+    severity: HIGH
+    category: defense_evasion
+    mitre_attack: T1562.008
+    event_types:
+      - UpdateTrail
+      - PutEventSelectors
+
+  - id: EVASION_GUARDDUTY_DISABLED
+    name: "GuardDuty Disabled"
+    description: "AWS GuardDuty threat detection disabled"
+    severity: CRITICAL
+    category: defense_evasion
+    mitre_attack: T1562.001
+    event_types:
+      - DeleteDetector
+      - StopMonitoringMembers
+      - DisassociateMembers
+
+  - id: EVASION_CONFIG_DISABLED
+    name: "AWS Config Disabled"
+    description: "AWS Config compliance monitoring disabled"
+    severity: HIGH
+    category: defense_evasion
+    mitre_attack: T1562.001
+    event_types:
+      - DeleteConfigRule
+      - StopConfigurationRecorder
+      - DeleteConfigurationRecorder
+
+  - id: EVASION_SECURITYHUB_DISABLED
+    name: "Security Hub Disabled"
+    description: "AWS Security Hub disabled"
+    severity: HIGH
+    category: defense_evasion
+    mitre_attack: T1562.001
+    event_types:
+      - DisableSecurityHub
+      - DeleteInsight
+
+  - id: EVASION_AZURE_DEFENDER_DISABLED
+    name: "Azure Defender Disabled"
+    description: "Azure Defender for Cloud disabled"
+    severity: CRITICAL
+    category: defense_evasion
+    event_types:
+      - Microsoft.Security/pricings/write
+    condition:
+      contains:
+        - "pricingTier': 'Free"
+
+  - id: EVASION_GCP_AUDIT_DISABLED
+    name: "GCP Audit Logs Modified"
+    description: "GCP audit logging configuration modified"
+    severity: HIGH
+    category: defense_evasion
+    event_types:
+      - SetIamPolicy
+      - google.logging.v2.ConfigServiceV2.UpdateSink
+      - logging.sinks.delete
+
+  - id: EVASION_ALARM_DELETED
+    name: "Monitoring Alarm Deleted"
+    description: "CloudWatch alarm or monitoring alert deleted"
+    severity: MEDIUM
+    category: defense_evasion
+    mitre_attack: T1562.001
+    event_types:
+      - DeleteAlarms
+      - Microsoft.Insights/alertRules/delete
+      - monitoring.alertPolicies.delete
+
+  - id: EVASION_LOG_GROUP_DELETED
+    name: "Log Group Deleted"
+    description: "CloudWatch log group was deleted"
+    severity: HIGH
+    category: defense_evasion
+    mitre_attack: T1070.001
+    event_types:
+      - DeleteLogGroup
+      - DeleteLogStream
+
+# =============================================================================
+# CRYPTO MINING & RANSOMWARE
+# =============================================================================
+malware_rules:
+
+  - id: MALWARE_CRYPTO_INSTANCE_TYPE
+    name: "Crypto Mining Instance Type"
+    description: "GPU or compute-optimized instance launched"
+    severity: MEDIUM
+    category: cryptomining
+    mitre_attack: T1496
+    event_types:
+      - RunInstances
+    condition:
+      instance_types:
+        - "p2."
+        - "p3."
+        - "p4."
+        - "g4dn."
+        - "g5."
+        - "c5."
+        - "c6g."
+
+  - id: MALWARE_CRYPTO_MASS_INSTANCES
+    name: "Mass Instance Launch"
+    description: "Large number of instances launched rapidly"
+    severity: HIGH
+    category: cryptomining
+    mitre_attack: T1496
+    correlation:
+      event_type: RunInstances
+      threshold: 20
+      window_minutes: 30
+      group_by: actor_id
+
+  - id: MALWARE_EBS_ENCRYPTION_OFF
+    name: "EBS Volume Without Encryption"
+    description: "EBS volume created without encryption"
+    severity: MEDIUM
+    category: data_exposure
+    event_types:
+      - CreateVolume
+    condition:
+      encrypted: false
+
+  - id: MALWARE_KMS_KEY_DELETED
+    name: "KMS Key Scheduled for Deletion"
+    description: "Encryption key scheduled for deletion - ransomware indicator"
+    severity: CRITICAL
+    category: ransomware
+    mitre_attack: T1486
+    event_types:
+      - ScheduleKeyDeletion
+      - DisableKey
+      - Microsoft.KeyVault/vaults/keys/delete
+
+  - id: MALWARE_MASS_ENCRYPTION
+    name: "Mass Encryption Activity"
+    description: "Unusual encryption activity - potential ransomware"
+    severity: CRITICAL
+    category: ransomware
+    mitre_attack: T1486
+    correlation:
+      event_types:
+        - Encrypt
+        - GenerateDataKey
+      threshold: 100
+      window_minutes: 30
+      group_by: actor_id
+
+# =============================================================================
+# LATERAL MOVEMENT
+# =============================================================================
+lateral_movement_rules:
+
+  - id: LATERAL_SSM_SESSION
+    name: "SSM Session Started"
+    description: "Systems Manager session started to EC2 instance"
+    severity: LOW
+    category: lateral_movement
+    mitre_attack: T1021.007
+    event_types:
+      - StartSession
+
+  - id: LATERAL_EC2_INSTANCE_CONNECT
+    name: "EC2 Instance Connect Used"
+    description: "EC2 Instance Connect used for SSH access"
+    severity: LOW
+    category: lateral_movement
+    mitre_attack: T1021.004
+    event_types:
+      - SendSSHPublicKey
+
+  - id: LATERAL_LAMBDA_INVOKE_CROSS
+    name: "Cross-Account Lambda Invoke"
+    description: "Lambda function invoked from different account"
+    severity: MEDIUM
+    category: lateral_movement
+    event_types:
+      - Invoke
+    condition:
+      cross_account: true
+
+  - id: LATERAL_ECS_EXEC
+    name: "ECS Container Exec"
+    description: "Executive command run inside ECS container"
+    severity: MEDIUM
+    category: lateral_movement
+    mitre_attack: T1609
+    event_types:
+      - ExecuteCommand
+
+# =============================================================================
+# PERSISTENCE MECHANISMS
+# =============================================================================
+persistence_rules:
+
+  - id: PERSIST_LAMBDA_BACKDOOR
+    name: "Lambda Function Created/Modified"
+    description: "New Lambda function or modification detected"
+    severity: MEDIUM
+    category: persistence
+    mitre_attack: T1072
+    event_types:
+      - CreateFunction
+      - UpdateFunctionCode
+      - UpdateFunctionConfiguration
+
+  - id: PERSIST_SCHEDULED_TASK
+    name: "Scheduled Task Created"
+    description: "EventBridge rule or scheduled task created"
+    severity: MEDIUM
+    category: persistence
+    mitre_attack: T1053.007
+    event_types:
+      - PutRule
+      - PutTargets
+      - CreateSchedule
+
+  - id: PERSIST_EC2_USERDATA
+    name: "EC2 User Data Modified"
+    description: "Instance user data script was modified"
+    severity: HIGH
+    category: persistence
+    mitre_attack: T1059
+    event_types:
+      - ModifyInstanceAttribute
+    condition:
+      contains:
+        - "userData"
+
+  - id: PERSIST_SSM_DOCUMENT
+    name: "SSM Document Created"
+    description: "Systems Manager document (automation) created"
+    severity: MEDIUM
+    category: persistence
+    mitre_attack: T1059
+    event_types:
+      - CreateDocument
+      - UpdateDocument
+
+  - id: PERSIST_CONTAINER_REGISTRY
+    name: "Container Image Pushed"
+    description: "Container image pushed to registry"
+    severity: LOW
+    category: persistence
+    event_types:
+      - PutImage
+      - BatchCheckLayerAvailability
+      - Microsoft.ContainerRegistry/registries/push/action
+
+# =============================================================================
+# RECONNAISSANCE
+# =============================================================================
+reconnaissance_rules:
+
+  - id: RECON_IAM_ENUMERATION
+    name: "IAM Enumeration"
+    description: "Extensive IAM listing - potential reconnaissance"
+    severity: MEDIUM
+    category: reconnaissance
+    mitre_attack: T1087.004
+    correlation:
+      event_types:
+        - ListUsers
+        - ListRoles
+        - ListGroups
+        - ListPolicies
+        - GetAccountAuthorizationDetails
+      threshold: 10
+      window_minutes: 10
+      group_by: actor_id
+
+  - id: RECON_S3_ENUMERATION
+    name: "S3 Bucket Enumeration"
+    description: "Extensive S3 bucket listing"
+    severity: LOW
+    category: reconnaissance
+    mitre_attack: T1580
+    event_types:
+      - ListBuckets
+      - GetBucketLocation
+      - GetBucketAcl
+
+  - id: RECON_EC2_DESCRIBE
+    name: "EC2 Infrastructure Enumeration"
+    description: "Extensive EC2 describe calls"
+    severity: LOW
+    category: reconnaissance
+    mitre_attack: T1580
+    correlation:
+      event_types:
+        - DescribeInstances
+        - DescribeSecurityGroups
+        - DescribeSubnets
+        - DescribeVpcs
+      threshold: 20
+      window_minutes: 10
+      group_by: actor_id
+
+# =============================================================================
+# MULTI-STEP ATTACK PATTERNS (CORRELATION)
+# =============================================================================
+attack_patterns:
+
+  - id: PATTERN_INITIAL_ACCESS_TO_PERSISTENCE
+    name: "Initial Access to Persistence"
+    description: "Successful breach followed by persistence mechanism creation"
+    severity: CRITICAL
+    category: attack_chain
+    mitre_tactics:
+      - TA0001  # Initial Access
+      - TA0003  # Persistence
+    correlation:
+      sequence:
+        - rule: AUTH_SUCCESS_AFTER_FAILURES
+        - rules_any:
+            - PRIV_ACCESS_KEY_CREATED
+            - PERSIST_LAMBDA_BACKDOOR
+            - PERSIST_SCHEDULED_TASK
+      window_minutes: 60
+      group_by: source_ip
+
+  - id: PATTERN_PRIV_ESC_TO_EXFIL
+    name: "Privilege Escalation to Exfiltration"
+    description: "Privilege escalation followed by data access"
+    severity: CRITICAL
+    category: attack_chain
+    mitre_tactics:
+      - TA0004  # Privilege Escalation
+      - TA0010  # Exfiltration
+    correlation:
+      sequence:
+        - rules_any:
+            - PRIV_ADMIN_POLICY_ATTACHED
+            - PRIV_INLINE_POLICY_STAR
+        - rules_any:
+            - DATA_MASS_DOWNLOAD
+            - DATA_BUCKET_PUBLIC
+      window_minutes: 120
+      group_by: actor_id
+
+  - id: PATTERN_DEFENSE_EVASION_CHAIN
+    name: "Defense Evasion Chain"
+    description: "Logging disabled followed by malicious activity"
+    severity: CRITICAL
+    category: attack_chain
+    mitre_tactics:
+      - TA0005  # Defense Evasion
+    correlation:
+      sequence:
+        - rules_any:
+            - EVASION_CLOUDTRAIL_STOPPED
+            - EVASION_GUARDDUTY_DISABLED
+        - rules_any:
+            - RES_DATABASE_DELETED
+            - RES_BACKUP_DELETED
+            - DATA_MASS_DOWNLOAD
+      window_minutes: 60
+      group_by: actor_id
+
+  - id: PATTERN_RANSOMWARE_ATTACK
+    name: "Ransomware Attack Pattern"
+    description: "Encryption activity + backup deletion + key deletion"
+    severity: CRITICAL
+    category: attack_chain
+    mitre_tactics:
+      - TA0040  # Impact
+    correlation:
+      sequence:
+        - rule: RES_BACKUP_DELETED
+        - rule: MALWARE_KMS_KEY_DELETED
+      window_minutes: 60
+      group_by: actor_id
+
+  - id: PATTERN_DATA_THEFT
+    name: "Data Theft Pattern"
+    description: "Bucket made public followed by large download"
+    severity: CRITICAL
+    category: attack_chain
+    mitre_tactics:
+      - TA0010  # Exfiltration
+    correlation:
+      sequence:
+        - rule: DATA_BUCKET_PUBLIC
+        - rule: DATA_LARGE_DOWNLOAD
+      window_minutes: 120
+      group_by: resource_id
+
+  - id: PATTERN_CRYPTO_MINING
+    name: "Crypto Mining Attack"
+    description: "New access key followed by GPU instance launch"
+    severity: HIGH
+    category: attack_chain
+    mitre_tactics:
+      - TA0040  # Impact
+    correlation:
+      sequence:
+        - rule: PRIV_ACCESS_KEY_CREATED
+        - rule: MALWARE_CRYPTO_INSTANCE_TYPE
+      window_minutes: 30
+      group_by: actor_id
+
+  - id: PATTERN_ACCOUNT_TAKEOVER
+    name: "Account Takeover"
+    description: "Brute force → success → MFA disable → persistence"
+    severity: CRITICAL
+    category: attack_chain
+    mitre_tactics:
+      - TA0001  # Initial Access
+      - TA0003  # Persistence
+      - TA0005  # Defense Evasion
+    correlation:
+      sequence:
+        - rule: AUTH_BRUTE_FORCE
+        - rule: AUTH_SUCCESS_AFTER_FAILURES
+        - rule: AUTH_MFA_DISABLED
+        - rule: PRIV_ACCESS_KEY_CREATED
+      window_minutes: 60
+      group_by: source_ip
+
+  - id: PATTERN_INSIDER_THREAT
+    name: "Insider Threat Pattern"
+    description: "Off-hours activity + secrets access + external share"
+    severity: CRITICAL
+    category: attack_chain
+    mitre_tactics:
+      - TA0007  # Discovery
+      - TA0010  # Exfiltration
+    correlation:
+      sequence:
+        - rule: AUTH_UNUSUAL_HOUR_LOGIN
+        - rule: DATA_SECRETS_ACCESSED
+        - rule: DATA_EXTERNAL_SHARE
+      window_minutes: 120
+      group_by: actor_id
+
+  - id: PATTERN_LATERAL_TO_IMPACT
+    name: "Lateral Movement to Impact"
+    description: "Lateral movement followed by destructive action"
+    severity: CRITICAL
+    category: attack_chain
+    mitre_tactics:
+      - TA0008  # Lateral Movement
+      - TA0040  # Impact
+    correlation:
+      sequence:
+        - rules_any:
+            - LATERAL_SSM_SESSION
+            - LATERAL_ECS_EXEC
+        - rules_any:
+            - RES_DATABASE_DELETED
+            - RES_MASS_DELETION
+      window_minutes: 60
+      group_by: actor_id
+
+  - id: PATTERN_NETWORK_PIVOT_EXFIL
+    name: "Network Pivot to Exfiltration"
+    description: "VPC peering + security group change + data download"
+    severity: CRITICAL
+    category: attack_chain
+    mitre_tactics:
+      - TA0008  # Lateral Movement
+      - TA0010  # Exfiltration
+    correlation:
+      sequence:
+        - rule: NET_VPC_PEERING_CREATED
+        - rule: NET_SECURITY_GROUP_OPEN_ALL
+        - rule: DATA_LARGE_DOWNLOAD
+      window_minutes: 180
+      group_by: actor_id
+
+  - id: PATTERN_SUPPLY_CHAIN
+    name: "Supply Chain Compromise"
+    description: "Container push followed by Lambda update"
+    severity: HIGH
+    category: attack_chain
+    mitre_tactics:
+      - TA0001  # Initial Access via Supply Chain
+    correlation:
+      sequence:
+        - rule: PERSIST_CONTAINER_REGISTRY
+        - rule: PERSIST_LAMBDA_BACKDOOR
+      window_minutes: 60
+      group_by: actor_id
