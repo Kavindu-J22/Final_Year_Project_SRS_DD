@@ -1,9 +1,10 @@
 'use client';
+import { useState } from 'react';
 import {
   ComposedChart, Area, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, Legend, ReferenceLine,
 } from 'recharts';
-import { Activity, ShieldAlert } from 'lucide-react';
+import { Activity, ShieldAlert, ToggleLeft, ToggleRight, Database, FlaskConical } from 'lucide-react';
 
 // ── Default demo data (shown when no real data present) ───────────────────────
 const DEMO = [
@@ -41,20 +42,25 @@ const CustomTooltip = ({ active, payload, label }) => {
 };
 
 export default function ForensicTimeline({ data }) {
-  const chartData  = data?.length ? data : DEMO;
-  const isLiveData = !!data?.length;
+  // Default = Demo mode; user can toggle to Live (DB) data
+  const [showDemo, setShowDemo] = useState(true);
 
-  const totalNormal  = chartData.reduce((s, d) => s + (d.normal  || 0), 0);
-  const totalAttacks = chartData.reduce((s, d) => s + (d.attacks || 0), 0);
+  const hasLiveData = !!(data?.length);
+  const chartData   = showDemo ? DEMO : (hasLiveData ? data : null);
+
+  const totalNormal  = (chartData ?? DEMO).reduce((s, d) => s + (d.normal  || 0), 0);
+  const totalAttacks = (chartData ?? DEMO).reduce((s, d) => s + (d.attacks || 0), 0);
   const attackRate   = (totalNormal + totalAttacks) > 0
     ? ((totalAttacks / (totalNormal + totalAttacks)) * 100).toFixed(1)
     : '0.0';
-  const rateColor = parseFloat(attackRate) > 5 ? 'text-red-400' : parseFloat(attackRate) > 1 ? 'text-amber-400' : 'text-emerald-400';
+  const rateColor = parseFloat(attackRate) > 5
+    ? 'text-red-400' : parseFloat(attackRate) > 1
+    ? 'text-amber-400' : 'text-emerald-400';
 
   return (
     <div className="glass-card p-5">
       {/* Header */}
-      <div className="flex items-center justify-between mb-3">
+      <div className="flex items-start justify-between mb-3 gap-3">
         <div>
           <div className="flex items-center gap-2">
             <Activity className="w-4 h-4 text-cyan-400" />
@@ -62,12 +68,35 @@ export default function ForensicTimeline({ data }) {
           </div>
           <p className="text-[11px] text-slate-500 mt-0.5">Normal traffic vs. detected attack events · DBSCAN + MITRE ATT&CK</p>
         </div>
-        {isLiveData
-          ? <span className="text-[10px] bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 px-2 py-0.5 rounded font-mono flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse inline-block"/>LIVE DATA
-            </span>
-          : <span className="text-[10px] bg-amber-500/10 border border-amber-500/30 text-amber-400 px-2 py-0.5 rounded font-mono">DEMO DATA</span>
-        }
+
+        {/* Demo / Live toggle */}
+        <div className="flex items-center gap-1.5 flex-shrink-0">
+          <button
+            onClick={() => setShowDemo(true)}
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-l-lg border text-[10px] font-mono font-medium transition-all ${
+              showDemo
+                ? 'bg-amber-500/20 border-amber-500/50 text-amber-300'
+                : 'bg-slate-900/60 border-slate-700/40 text-slate-500 hover:text-slate-400'
+            }`}
+          >
+            <FlaskConical className="w-3 h-3" />
+            Demo
+          </button>
+          <button
+            onClick={() => setShowDemo(false)}
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-r-lg border text-[10px] font-mono font-medium transition-all ${
+              !showDemo
+                ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-300'
+                : 'bg-slate-900/60 border-slate-700/40 text-slate-500 hover:text-slate-400'
+            }`}
+          >
+            <Database className="w-3 h-3" />
+            Live
+            {hasLiveData && !showDemo && (
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse inline-block" />
+            )}
+          </button>
+        </div>
       </div>
 
       {/* Stats Row */}
@@ -88,35 +117,43 @@ export default function ForensicTimeline({ data }) {
         </div>
       </div>
 
-      {/* Chart */}
-      <ResponsiveContainer width="100%" height={265}>
-        <ComposedChart data={chartData} margin={{ top: 8, right: 12, left: -20, bottom: 0 }}>
-          <defs>
-            <linearGradient id="normalGrad" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%"  stopColor="#06b6d4" stopOpacity={0.3} />
-              <stop offset="95%" stopColor="#06b6d4" stopOpacity={0.02} />
-            </linearGradient>
-          </defs>
-          <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.06)" />
-          <XAxis dataKey="time" tick={{ fill: '#475569', fontSize: 10 }} axisLine={{ stroke: '#1e293b' }} tickLine={false} />
-          <YAxis tick={{ fill: '#475569', fontSize: 10 }} axisLine={{ stroke: '#1e293b' }} tickLine={false} />
-          <Tooltip content={<CustomTooltip />} />
-          <Legend wrapperStyle={{ fontSize: 11, color: '#64748b', paddingTop: 10 }} />
+      {/* Chart or no-data message */}
+      {!chartData ? (
+        <div className="flex flex-col items-center justify-center h-[265px] text-slate-600 gap-3">
+          <Database className="w-10 h-10 opacity-30" />
+          <p className="text-sm font-mono">No live data in database yet.</p>
+          <p className="text-xs text-slate-700">Click <span className="text-amber-400 font-semibold">Demo</span> to see a sample chart, or click <span className="text-cyan-400 font-semibold">"Load Demo Data"</span> on the Logs page to seed the database.</p>
+        </div>
+      ) : (
+        <ResponsiveContainer width="100%" height={265}>
+          <ComposedChart data={chartData} margin={{ top: 8, right: 12, left: -20, bottom: 0 }}>
+            <defs>
+              <linearGradient id="normalGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%"  stopColor="#06b6d4" stopOpacity={0.3} />
+                <stop offset="95%" stopColor="#06b6d4" stopOpacity={0.02} />
+              </linearGradient>
+            </defs>
+            <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.06)" />
+            <XAxis dataKey="time" tick={{ fill: '#475569', fontSize: 10 }} axisLine={{ stroke: '#1e293b' }} tickLine={false} />
+            <YAxis tick={{ fill: '#475569', fontSize: 10 }} axisLine={{ stroke: '#1e293b' }} tickLine={false} />
+            <Tooltip content={<CustomTooltip />} />
+            <Legend wrapperStyle={{ fontSize: 11, color: '#64748b', paddingTop: 10 }} />
 
-          {/* Reference lines only for demo data with known time labels */}
-          {!isLiveData && <>
-            <ReferenceLine x="04:00" stroke="rgba(239,68,68,0.35)" strokeDasharray="4 3"
-              label={{ value: '⚠ Recon', fill: '#f87171', fontSize: 9, position: 'top' }} />
-            <ReferenceLine x="20:00" stroke="rgba(239,68,68,0.45)" strokeDasharray="4 3"
-              label={{ value: '⚠ Exfil', fill: '#f87171', fontSize: 9, position: 'top' }} />
-          </>}
+            {/* Reference lines only for demo mode with known time labels */}
+            {showDemo && <>
+              <ReferenceLine x="04:00" stroke="rgba(239,68,68,0.35)" strokeDasharray="4 3"
+                label={{ value: '⚠ Recon', fill: '#f87171', fontSize: 9, position: 'top' }} />
+              <ReferenceLine x="20:00" stroke="rgba(239,68,68,0.45)" strokeDasharray="4 3"
+                label={{ value: '⚠ Exfil', fill: '#f87171', fontSize: 9, position: 'top' }} />
+            </>}
 
-          <Area  type="monotone" dataKey="normal"  name="Normal Traffic" stroke="#06b6d4" strokeWidth={2}
-            fill="url(#normalGrad)" dot={false} />
-          <Bar   dataKey="attacks" name="Attack Events" fill="#ef4444" fillOpacity={0.85}
-            radius={[3, 3, 0, 0]} maxBarSize={28} />
-        </ComposedChart>
-      </ResponsiveContainer>
+            <Area type="monotone" dataKey="normal"  name="Normal Traffic" stroke="#06b6d4" strokeWidth={2}
+              fill="url(#normalGrad)" dot={false} />
+            <Bar  dataKey="attacks" name="Attack Events" fill="#ef4444" fillOpacity={0.85}
+              radius={[3, 3, 0, 0]} maxBarSize={28} />
+          </ComposedChart>
+        </ResponsiveContainer>
+      )}
     </div>
   );
 }

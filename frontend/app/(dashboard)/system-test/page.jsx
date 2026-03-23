@@ -30,6 +30,63 @@ function StatusBadge({ status }) {
   return <span className="flex items-center gap-1 text-xs font-mono text-red-400"><XCircle className="w-3.5 h-3.5"/>FAIL</span>;
 }
 
+// ── Flat result card for typed suites (Health / Security / Accuracy / Integration) ──
+function SuiteResultCard({ result }) {
+  const comp = result?.components?.[0];
+  if (!comp) return null;
+
+  const SUITE_ICON = {
+    'Service Health Check Suite':       { Icon: HeartPulse, color: 'text-sky-400',    bg: 'bg-sky-500/5',    border: 'border-sky-500/20'    },
+    'Security Attack Simulation Suite': { Icon: Shield,     color: 'text-red-400',    bg: 'bg-red-500/5',    border: 'border-red-500/20'    },
+    'ML Accuracy Validation Suite':     { Icon: Target,     color: 'text-violet-400', bg: 'bg-violet-500/5', border: 'border-violet-500/20' },
+    'End-to-End Integration Suite':     { Icon: Link2,      color: 'text-lime-400',   bg: 'bg-lime-500/5',   border: 'border-lime-500/20'   },
+  };
+  const meta = SUITE_ICON[comp.name] ?? { Icon: FlaskConical, color: 'text-cyan-400', bg: 'bg-cyan-500/5', border: 'border-cyan-500/20' };
+  const { Icon } = meta;
+
+  return (
+    <div className={`glass-card p-5 border ${meta.border} lg:col-span-2`}>
+      <div className="flex items-start justify-between mb-4">
+        <div className="flex items-center gap-3">
+          <div className={`w-9 h-9 rounded-lg ${meta.bg} border ${meta.border} flex items-center justify-center flex-shrink-0`}>
+            <Icon className={`w-5 h-5 ${meta.color}`} />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-slate-200 leading-tight">{comp.name}</p>
+            <p className="text-[10px] text-slate-600 font-mono mt-0.5">
+              {result.startedAt ? new Date(result.startedAt).toLocaleString('en-GB') : ''} · {result.durationMs}ms
+            </p>
+          </div>
+        </div>
+        <StatusBadge status={comp.status} />
+      </div>
+
+      <div className="space-y-1.5">
+        <div className="flex justify-between text-[10px] text-slate-500 mb-2 border-b border-slate-800 pb-1">
+          <span>Test Cases</span>
+          <span className="font-mono">
+            <span className="text-emerald-400">{comp.passed} PASS</span>
+            {comp.failed > 0 && <span className="text-red-400 ml-2">{comp.failed} FAIL</span>}
+          </span>
+        </div>
+        {comp.tests?.map((t, i) => (
+          <div key={i} className={`flex items-start gap-2 p-2 rounded text-xs ${
+            t.status === 'PASS' ? 'bg-emerald-500/5' : 'bg-red-500/8'}`}>
+            {t.status === 'PASS'
+              ? <CheckCircle className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0 mt-0.5"/>
+              : <XCircle    className="w-3.5 h-3.5 text-red-400 flex-shrink-0 mt-0.5"/>}
+            <div className="min-w-0 flex-1">
+              <p className="font-medium text-slate-300">{t.name}</p>
+              <p className="text-slate-500 font-mono text-[10px] mt-0.5 break-all">{t.detail}</p>
+            </div>
+            <span className="text-[9px] text-slate-600 font-mono flex-shrink-0">{t.durationMs}ms</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function ComponentCard({ meta, result }) {
   const Icon = meta.icon;
   const allPass = result && result.status === 'PASS';
@@ -211,13 +268,19 @@ export default function SystemTestPage() {
           </div>
         )}
 
-        {/* Component cards */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-          {COMPONENT_META.map((meta) => {
-            const compResult = result?.components?.find(c => c.id === meta.id);
-            return <ComponentCard key={meta.id} meta={meta} result={compResult} />;
-          })}
-        </div>
+        {/* Result cards — suite view OR component grid */}
+        {result?.suiteName ? (
+          <div className="grid grid-cols-1 gap-5">
+            <SuiteResultCard result={result} />
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+            {COMPONENT_META.map((meta) => {
+              const compResult = result?.components?.find(c => c.id === meta.id);
+              return <ComponentCard key={meta.id} meta={meta} result={compResult} />;
+            })}
+          </div>
+        )}
 
         {/* How it works */}
         {!result && !running && (
