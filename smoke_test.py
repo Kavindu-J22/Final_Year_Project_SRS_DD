@@ -9,7 +9,7 @@ def get(url):
     try:
         with urllib.request.urlopen(url, timeout=8) as r:
             return r.status, json.loads(r.read())
-    except Exception as e:
+    except BaseException as e:
         return 0, str(e)
 
 def post(url, payload):
@@ -19,8 +19,11 @@ def post(url, payload):
         with urllib.request.urlopen(req, timeout=8) as r:
             return r.status, json.loads(r.read())
     except urllib.error.HTTPError as e:
-        return e.code, json.loads(e.read())
-    except Exception as e:
+        try:
+            return e.code, json.loads(e.read())
+        except BaseException:
+            return e.code, str(e)
+    except BaseException as e:
         return 0, str(e)
 
 def section(title):

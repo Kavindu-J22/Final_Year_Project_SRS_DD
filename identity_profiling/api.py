@@ -9,11 +9,13 @@ Run: uvicorn api:app --port 8001
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 from typing import List, Dict, Optional
-import joblib
+import sys, os
 import numpy as np
-import os
 import json
 from datetime import datetime
+
+# Allow importing from src/
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
 
 app = FastAPI(
     title="Identity Attribution & Behavior Profiling API",
@@ -53,19 +55,37 @@ class HealthResponse(BaseModel):
     models_loaded: bool
     api_version: str
 
-# Load ML models
+# Load ML models using the proper wrapper classes
 def load_ensemble_models():
     models = {}
-    models_dir = "models"
+    models_dir = os.path.join(os.path.dirname(__file__), "models")
     try:
-        if os.path.exists(f"{models_dir}/isolation_forest.pkl"):
-            models['isolation_forest'] = joblib.load(f"{models_dir}/isolation_forest.pkl")
-        if os.path.exists(f"{models_dir}/one_class_svm.pkl"):
-            models['one_class_svm'] = joblib.load(f"{models_dir}/one_class_svm.pkl")
-        if os.path.exists(f"{models_dir}/autoencoder.pkl"):
-            models['autoencoder'] = joblib.load(f"{models_dir}/autoencoder.pkl")
+        from ml_models import IsolationForestModel, AutoencoderModel, OneClassSVMModel
+        # Isolation Forest
+        if_path = os.path.join(models_dir, "isolation_forest.pkl")
+        if os.path.exists(if_path):
+            m = IsolationForestModel()
+            m.load(if_path)
+            models['isolation_forest'] = m
+            print("Loaded: isolation_forest")
+        # One-Class SVM (try both filenames)
+        for svm_name in ["one_class_svm.pkl", "sgd_one_class_svm.pkl"]:
+            svm_path = os.path.join(models_dir, svm_name)
+            if os.path.exists(svm_path):
+                m = OneClassSVMModel()
+                m.load(svm_path)
+                models['one_class_svm'] = m
+                print(f"Loaded: one_class_svm ({svm_name})")
+                break
+        # Autoencoder
+        ae_path = os.path.join(models_dir, "autoencoder.pkl")
+        if os.path.exists(ae_path):
+            m = AutoencoderModel(input_dim=7)
+            m.load(ae_path)
+            models['autoencoder'] = m
+            print("Loaded: autoencoder")
     except Exception as e:
-        print(f"Warning: {e}")
+        print(f"Warning loading ML models: {e}")
     return models
 
 MODELS = load_ensemble_models()
