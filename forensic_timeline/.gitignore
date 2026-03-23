@@ -18,8 +18,7 @@ models/*.h5
 models/*.pt
 models/*.pth
 
-# ── Dataset (large log files & licensed datasets) ────────────────────────────
-data/
+
 
 # ── Jupyter Notebooks checkpoints ────────────────────────────────────────────
 notebooks/.ipynb_checkpoints/
@@ -39,4 +38,7 @@ logs/
 Thumbs.db
 .vscode/
 .idea/
+
+# ── Large Splunk binary data (exceeds GitHub 100 MB limit) ───────────────────
+data/botsv1_data_set/var/
 

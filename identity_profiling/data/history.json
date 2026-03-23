@@ -1,0 +1,755 @@
+[
+  {
+    "user_id": "suspicious@test.com",
+    "is_anomaly": true,
+    "anomaly_score": 0.0,
+    "risk_level": "LOW",
+    "contributing_factors": [
+      "Unusual access time (late night/early morning)",
+      "High file access ratio (potential data exfiltration)"
+    ],
+    "model_votes": {},
+    "timestamp": "2026-03-23T08:26:22.394572"
+  },
+  {
+    "user_id": "suspicious@test.com",
+    "is_anomaly": true,
+    "anomaly_score": 0.0,
+    "risk_level": "LOW",
+    "contributing_factors": [
+      "Unusual access time (late night/early morning)",
+      "High file access ratio (potential data exfiltration)"
+    ],
+    "model_votes": {},
+    "timestamp": "2026-03-23T08:27:44.502892"
+  },
+  {
+    "user_id": "alice.smith@company.com",
+    "is_anomaly": false,
+    "anomaly_score": 0.0,
+    "risk_level": "LOW",
+    "contributing_factors": [],
+    "model_votes": {
+      "heuristic_fallback": 1
+    },
+    "timestamp": "2026-03-23T10:35:09.139095"
+  },
+  {
+    "user_id": "suspicious.actor@external.com",
+    "is_anomaly": false,
+    "anomaly_score": 0.4,
+    "risk_level": "MEDIUM",
+    "contributing_factors": [
+      "Unusual access time (late night/early morning)",
+      "High file access ratio (potential data exfiltration)"
+    ],
+    "model_votes": {
+      "heuristic_fallback": 1
+    },
+    "timestamp": "2026-03-23T10:35:11.150531"
+  },
+  {
+    "user_id": "alice.smith@company.com",
+    "is_anomaly": true,
+    "anomaly_score": 1.0,
+    "risk_level": "CRITICAL",
+    "contributing_factors": [
+      "General behavioral deviation from baseline"
+    ],
+    "model_votes": {
+      "isolation_forest": -1,
+      "one_class_svm": -1,
+      "autoencoder": -1
+    },
+    "timestamp": "2026-03-23T10:40:30.866765"
+  },
+  {
+    "user_id": "suspicious.actor@external.com",
+    "is_anomaly": true,
+    "anomaly_score": 1.0,
+    "risk_level": "CRITICAL",
+    "contributing_factors": [
+      "Unusual access time (late night/early morning)",
+      "High file access ratio (potential data exfiltration)"
+    ],
+    "model_votes": {
+      "isolation_forest": -1,
+      "one_class_svm": -1,
+      "autoencoder": -1
+    },
+    "timestamp": "2026-03-23T10:40:32.887473"
+  },
+  {
+    "user_id": "alice.smith@company.com",
+    "is_anomaly": false,
+    "anomaly_score": 0.0,
+    "risk_level": "LOW",
+    "contributing_factors": [],
+    "model_votes": {
+      "isolation_forest": 1,
+      "one_class_svm": 1,
+      "autoencoder": 1
+    },
+    "timestamp": "2026-03-23T10:45:01.980570"
+  },
+  {
+    "user_id": "suspicious.actor@external.com",
+    "is_anomaly": false,
+    "anomaly_score": 0.0,
+    "risk_level": "LOW",
+    "contributing_factors": [
+      "Unusual access time (late night/early morning)",
+      "High file access ratio (potential data exfiltration)"
+    ],
+    "model_votes": {
+      "isolation_forest": 1,
+      "one_class_svm": 1,
+      "autoencoder": 1
+    },
+    "timestamp": "2026-03-23T10:45:04.005006"
+  },
+  {
+    "user_id": "alice.smith@company.com",
+    "is_anomaly": false,
+    "anomaly_score": 0.0,
+    "risk_level": "LOW",
+    "contributing_factors": [],
+    "model_votes": {
+      "heuristic_rules": 1,
+      "isolation_forest": 1,
+      "one_class_svm": 1,
+      "autoencoder": 1
+    },
+    "timestamp": "2026-03-23T10:47:13.817310"
+  },
+  {
+    "user_id": "suspicious.actor@external.com",
+    "is_anomaly": true,
+    "anomaly_score": 0.5,
+    "risk_level": "HIGH",
+    "contributing_factors": [
+      "Unusual access time (late night/early morning)",
+      "High file access ratio (potential data exfiltration)"
+    ],
+    "model_votes": {
+      "heuristic_rules": -1,
+      "isolation_forest": -1,
+      "one_class_svm": 1,
+      "autoencoder": 1
+    },
+    "timestamp": "2026-03-23T10:47:15.835539"
+  },
+  {
+    "user_id": "suspicious@test.com",
+    "is_anomaly": false,
+    "anomaly_score": 0.4,
+    "risk_level": "MEDIUM",
+    "contributing_factors": [
+      "Unusual access time (late night/early morning)",
+      "High file access ratio (potential data exfiltration)"
+    ],
+    "model_votes": {
+      "heuristic_fallback": 1
+    },
+    "timestamp": "2026-03-23T11:33:04.992873"
+  },
+  {
+    "user_id": "alice@company.com",
+    "is_anomaly": false,
+    "anomaly_score": 0.0,
+    "risk_level": "LOW",
+    "contributing_factors": [],
+    "model_votes": {
+      "heuristic_fallback": 1
+    },
+    "timestamp": "2026-03-23T11:33:05.003906"
+  },
+  {
+    "user_id": "suspicious@test.com",
+    "is_anomaly": false,
+    "anomaly_score": 0.4,
+    "risk_level": "MEDIUM",
+    "contributing_factors": [
+      "Unusual access time (late night/early morning)",
+      "High file access ratio (potential data exfiltration)"
+    ],
+    "model_votes": {
+      "heuristic_fallback": 1
+    },
+    "timestamp": "2026-03-23T11:50:44.563381"
+  },
+  {
+    "user_id": "alice@company.com",
+    "is_anomaly": false,
+    "anomaly_score": 0.0,
+    "risk_level": "LOW",
+    "contributing_factors": [],
+    "model_votes": {
+      "heuristic_fallback": 1
+    },
+    "timestamp": "2026-03-23T11:50:44.572558"
+  },
+  {
+    "user_id": "suspicious@test.com",
+    "is_anomaly": false,
+    "anomaly_score": 0.4,
+    "risk_level": "MEDIUM",
+    "contributing_factors": [
+      "Unusual access time (late night/early morning)",
+      "High file access ratio (potential data exfiltration)"
+    ],
+    "model_votes": {
+      "heuristic_fallback": 1
+    },
+    "timestamp": "2026-03-23T12:13:17.101600"
+  },
+  {
+    "user_id": "alice@company.com",
+    "is_anomaly": false,
+    "anomaly_score": 0.0,
+    "risk_level": "LOW",
+    "contributing_factors": [],
+    "model_votes": {
+      "heuristic_fallback": 1
+    },
+    "timestamp": "2026-03-23T12:13:17.108257"
+  },
+  {
+    "user_id": "suspicious@test.com",
+    "is_anomaly": false,
+    "anomaly_score": 0.4,
+    "risk_level": "MEDIUM",
+    "contributing_factors": [
+      "Unusual access time (late night/early morning)",
+      "High file access ratio (potential data exfiltration)"
+    ],
+    "model_votes": {
+      "heuristic_fallback": 1
+    },
+    "timestamp": "2026-03-23T12:13:27.687104"
+  },
+  {
+    "user_id": "alice@company.com",
+    "is_anomaly": false,
+    "anomaly_score": 0.0,
+    "risk_level": "LOW",
+    "contributing_factors": [],
+    "model_votes": {
+      "heuristic_fallback": 1
+    },
+    "timestamp": "2026-03-23T12:13:27.695845"
+  },
+  {
+    "user_id": "suspicious@test.com",
+    "is_anomaly": false,
+    "anomaly_score": 0.4,
+    "risk_level": "MEDIUM",
+    "contributing_factors": [
+      "Unusual access time (late night/early morning)",
+      "High file access ratio (potential data exfiltration)"
+    ],
+    "model_votes": {
+      "heuristic_fallback": 1
+    },
+    "timestamp": "2026-03-23T12:15:06.702336"
+  },
+  {
+    "user_id": "alice@company.com",
+    "is_anomaly": false,
+    "anomaly_score": 0.0,
+    "risk_level": "LOW",
+    "contributing_factors": [],
+    "model_votes": {
+      "heuristic_fallback": 1
+    },
+    "timestamp": "2026-03-23T12:15:06.710731"
+  },
+  {
+    "user_id": "suspicious@test.com",
+    "is_anomaly": false,
+    "anomaly_score": 0.4,
+    "risk_level": "MEDIUM",
+    "contributing_factors": [
+      "Unusual access time (late night/early morning)",
+      "High file access ratio (potential data exfiltration)"
+    ],
+    "model_votes": {
+      "heuristic_fallback": 1
+    },
+    "timestamp": "2026-03-23T12:52:52.812204"
+  },
+  {
+    "user_id": "alice@company.com",
+    "is_anomaly": false,
+    "anomaly_score": 0.0,
+    "risk_level": "LOW",
+    "contributing_factors": [],
+    "model_votes": {
+      "heuristic_fallback": 1
+    },
+    "timestamp": "2026-03-23T12:52:52.820852"
+  },
+  {
+    "user_id": "attacker@unknown.net",
+    "is_anomaly": true,
+    "anomaly_score": 0.8,
+    "risk_level": "CRITICAL",
+    "contributing_factors": [
+      "Unusual access time (late night/early morning)",
+      "High file access ratio (potential data exfiltration)",
+      "Multiple IP addresses in single session",
+      "Unusual weekend activity"
+    ],
+    "model_votes": {
+      "heuristic_fallback": -1
+    },
+    "timestamp": "2026-03-23T12:52:57.320104"
+  },
+  {
+    "user_id": "hacker@dark.net",
+    "is_anomaly": true,
+    "anomaly_score": 0.6000000000000001,
+    "risk_level": "HIGH",
+    "contributing_factors": [
+      "Unusual access time (late night/early morning)",
+      "High file access ratio (potential data exfiltration)",
+      "Multiple IP addresses in single session"
+    ],
+    "model_votes": {
+      "heuristic_fallback": -1
+    },
+    "timestamp": "2026-03-23T12:52:58.850854"
+  },
+  {
+    "user_id": "alice@company.com",
+    "is_anomaly": false,
+    "anomaly_score": 0.0,
+    "risk_level": "LOW",
+    "contributing_factors": [],
+    "model_votes": {
+      "heuristic_fallback": 1
+    },
+    "timestamp": "2026-03-23T12:52:58.856026"
+  },
+  {
+    "user_id": "intg_1774270380847",
+    "is_anomaly": true,
+    "anomaly_score": 0.6000000000000001,
+    "risk_level": "HIGH",
+    "contributing_factors": [
+      "Unusual access time (late night/early morning)",
+      "High file access ratio (potential data exfiltration)",
+      "Multiple IP addresses in single session"
+    ],
+    "model_votes": {
+      "heuristic_fallback": -1
+    },
+    "timestamp": "2026-03-23T12:53:00.852665"
+  },
+  {
+    "user_id": "suspicious@test.com",
+    "is_anomaly": false,
+    "anomaly_score": 0.4,
+    "risk_level": "MEDIUM",
+    "contributing_factors": [
+      "Unusual access time (late night/early morning)",
+      "High file access ratio (potential data exfiltration)"
+    ],
+    "model_votes": {
+      "heuristic_fallback": 1
+    },
+    "timestamp": "2026-03-23T12:53:04.458388"
+  },
+  {
+    "user_id": "alice@company.com",
+    "is_anomaly": false,
+    "anomaly_score": 0.0,
+    "risk_level": "LOW",
+    "contributing_factors": [],
+    "model_votes": {
+      "heuristic_fallback": 1
+    },
+    "timestamp": "2026-03-23T12:53:04.473756"
+  },
+  {
+    "user_id": "attacker@unknown.net",
+    "is_anomaly": true,
+    "anomaly_score": 0.8,
+    "risk_level": "CRITICAL",
+    "contributing_factors": [
+      "Unusual access time (late night/early morning)",
+      "High file access ratio (potential data exfiltration)",
+      "Multiple IP addresses in single session",
+      "Unusual weekend activity"
+    ],
+    "model_votes": {
+      "heuristic_fallback": -1
+    },
+    "timestamp": "2026-03-23T12:53:08.327057"
+  },
+  {
+    "user_id": "suspicious@test.com",
+    "is_anomaly": false,
+    "anomaly_score": 0.4,
+    "risk_level": "MEDIUM",
+    "contributing_factors": [
+      "Unusual access time (late night/early morning)",
+      "High file access ratio (potential data exfiltration)"
+    ],
+    "model_votes": {
+      "heuristic_fallback": 1
+    },
+    "timestamp": "2026-03-23T12:53:31.883582"
+  },
+  {
+    "user_id": "alice@company.com",
+    "is_anomaly": false,
+    "anomaly_score": 0.0,
+    "risk_level": "LOW",
+    "contributing_factors": [],
+    "model_votes": {
+      "heuristic_fallback": 1
+    },
+    "timestamp": "2026-03-23T12:53:31.893287"
+  },
+  {
+    "user_id": "attacker@unknown.net",
+    "is_anomaly": true,
+    "anomaly_score": 0.8,
+    "risk_level": "CRITICAL",
+    "contributing_factors": [
+      "Unusual access time (late night/early morning)",
+      "High file access ratio (potential data exfiltration)",
+      "Multiple IP addresses in single session",
+      "Unusual weekend activity"
+    ],
+    "model_votes": {
+      "heuristic_fallback": -1
+    },
+    "timestamp": "2026-03-23T12:53:38.055962"
+  },
+  {
+    "user_id": "hacker@dark.net",
+    "is_anomaly": true,
+    "anomaly_score": 0.6000000000000001,
+    "risk_level": "HIGH",
+    "contributing_factors": [
+      "Unusual access time (late night/early morning)",
+      "High file access ratio (potential data exfiltration)",
+      "Multiple IP addresses in single session"
+    ],
+    "model_votes": {
+      "heuristic_fallback": -1
+    },
+    "timestamp": "2026-03-23T12:53:39.347503"
+  },
+  {
+    "user_id": "alice@company.com",
+    "is_anomaly": false,
+    "anomaly_score": 0.0,
+    "risk_level": "LOW",
+    "contributing_factors": [],
+    "model_votes": {
+      "heuristic_fallback": 1
+    },
+    "timestamp": "2026-03-23T12:53:39.353061"
+  },
+  {
+    "user_id": "intg_1774270420432",
+    "is_anomaly": true,
+    "anomaly_score": 0.6000000000000001,
+    "risk_level": "HIGH",
+    "contributing_factors": [
+      "Unusual access time (late night/early morning)",
+      "High file access ratio (potential data exfiltration)",
+      "Multiple IP addresses in single session"
+    ],
+    "model_votes": {
+      "heuristic_fallback": -1
+    },
+    "timestamp": "2026-03-23T12:53:40.437066"
+  },
+  {
+    "user_id": "hacker@dark.net",
+    "is_anomaly": true,
+    "anomaly_score": 0.6000000000000001,
+    "risk_level": "HIGH",
+    "contributing_factors": [
+      "Unusual access time (late night/early morning)",
+      "High file access ratio (potential data exfiltration)",
+      "Multiple IP addresses in single session"
+    ],
+    "model_votes": {
+      "heuristic_fallback": -1
+    },
+    "timestamp": "2026-03-23T12:53:45.095291"
+  },
+  {
+    "user_id": "alice@company.com",
+    "is_anomaly": false,
+    "anomaly_score": 0.0,
+    "risk_level": "LOW",
+    "contributing_factors": [],
+    "model_votes": {
+      "heuristic_fallback": 1
+    },
+    "timestamp": "2026-03-23T12:53:45.099453"
+  },
+  {
+    "user_id": "attacker@unknown.net",
+    "is_anomaly": true,
+    "anomaly_score": 0.8,
+    "risk_level": "CRITICAL",
+    "contributing_factors": [
+      "Unusual access time (late night/early morning)",
+      "High file access ratio (potential data exfiltration)",
+      "Multiple IP addresses in single session",
+      "Unusual weekend activity"
+    ],
+    "model_votes": {
+      "heuristic_fallback": -1
+    },
+    "timestamp": "2026-03-23T12:57:30.685369"
+  },
+  {
+    "user_id": "hacker@dark.net",
+    "is_anomaly": true,
+    "anomaly_score": 0.6000000000000001,
+    "risk_level": "HIGH",
+    "contributing_factors": [
+      "Unusual access time (late night/early morning)",
+      "High file access ratio (potential data exfiltration)",
+      "Multiple IP addresses in single session"
+    ],
+    "model_votes": {
+      "heuristic_fallback": -1
+    },
+    "timestamp": "2026-03-23T12:57:34.726372"
+  },
+  {
+    "user_id": "alice@company.com",
+    "is_anomaly": false,
+    "anomaly_score": 0.0,
+    "risk_level": "LOW",
+    "contributing_factors": [],
+    "model_votes": {
+      "heuristic_fallback": 1
+    },
+    "timestamp": "2026-03-23T12:57:34.734402"
+  },
+  {
+    "user_id": "intg_1774270658052",
+    "is_anomaly": true,
+    "anomaly_score": 0.6000000000000001,
+    "risk_level": "HIGH",
+    "contributing_factors": [
+      "Unusual access time (late night/early morning)",
+      "High file access ratio (potential data exfiltration)",
+      "Multiple IP addresses in single session"
+    ],
+    "model_votes": {
+      "heuristic_fallback": -1
+    },
+    "timestamp": "2026-03-23T12:57:38.057209"
+  },
+  {
+    "user_id": "attacker@unknown.net",
+    "is_anomaly": true,
+    "anomaly_score": 0.8,
+    "risk_level": "CRITICAL",
+    "contributing_factors": [
+      "Unusual access time (late night/early morning)",
+      "High file access ratio (potential data exfiltration)",
+      "Multiple IP addresses in single session",
+      "Unusual weekend activity"
+    ],
+    "model_votes": {
+      "heuristic_fallback": -1
+    },
+    "timestamp": "2026-03-23T13:12:17.983823"
+  },
+  {
+    "user_id": "hacker@dark.net",
+    "is_anomaly": true,
+    "anomaly_score": 0.6000000000000001,
+    "risk_level": "HIGH",
+    "contributing_factors": [
+      "Unusual access time (late night/early morning)",
+      "High file access ratio (potential data exfiltration)",
+      "Multiple IP addresses in single session"
+    ],
+    "model_votes": {
+      "heuristic_fallback": -1
+    },
+    "timestamp": "2026-03-23T13:12:21.121944"
+  },
+  {
+    "user_id": "alice@company.com",
+    "is_anomaly": false,
+    "anomaly_score": 0.0,
+    "risk_level": "LOW",
+    "contributing_factors": [],
+    "model_votes": {
+      "heuristic_fallback": 1
+    },
+    "timestamp": "2026-03-23T13:12:21.128155"
+  },
+  {
+    "user_id": "intg_1774271550696",
+    "is_anomaly": true,
+    "anomaly_score": 0.6000000000000001,
+    "risk_level": "HIGH",
+    "contributing_factors": [
+      "Unusual access time (late night/early morning)",
+      "High file access ratio (potential data exfiltration)",
+      "Multiple IP addresses in single session"
+    ],
+    "model_votes": {
+      "heuristic_fallback": -1
+    },
+    "timestamp": "2026-03-23T13:12:30.710164"
+  },
+  {
+    "user_id": "hacker@dark.net",
+    "is_anomaly": true,
+    "anomaly_score": 0.6000000000000001,
+    "risk_level": "HIGH",
+    "contributing_factors": [
+      "Unusual access time (late night/early morning)",
+      "High file access ratio (potential data exfiltration)",
+      "Multiple IP addresses in single session"
+    ],
+    "model_votes": {
+      "heuristic_fallback": -1
+    },
+    "timestamp": "2026-03-23T13:12:34.440508"
+  },
+  {
+    "user_id": "alice@company.com",
+    "is_anomaly": false,
+    "anomaly_score": 0.0,
+    "risk_level": "LOW",
+    "contributing_factors": [],
+    "model_votes": {
+      "heuristic_fallback": 1
+    },
+    "timestamp": "2026-03-23T13:12:34.445796"
+  },
+  {
+    "user_id": "attacker@unknown.net",
+    "is_anomaly": true,
+    "anomaly_score": 0.8,
+    "risk_level": "CRITICAL",
+    "contributing_factors": [
+      "Unusual access time (late night/early morning)",
+      "High file access ratio (potential data exfiltration)",
+      "Multiple IP addresses in single session",
+      "Unusual weekend activity"
+    ],
+    "model_votes": {
+      "heuristic_fallback": -1
+    },
+    "timestamp": "2026-03-23T13:12:56.422166"
+  },
+  {
+    "user_id": "hacker@dark.net",
+    "is_anomaly": true,
+    "anomaly_score": 0.6000000000000001,
+    "risk_level": "HIGH",
+    "contributing_factors": [
+      "Unusual access time (late night/early morning)",
+      "High file access ratio (potential data exfiltration)",
+      "Multiple IP addresses in single session"
+    ],
+    "model_votes": {
+      "heuristic_fallback": -1
+    },
+    "timestamp": "2026-03-23T13:13:03.483281"
+  },
+  {
+    "user_id": "alice@company.com",
+    "is_anomaly": false,
+    "anomaly_score": 0.0,
+    "risk_level": "LOW",
+    "contributing_factors": [],
+    "model_votes": {
+      "heuristic_fallback": 1
+    },
+    "timestamp": "2026-03-23T13:13:03.487302"
+  },
+  {
+    "user_id": "suspicious@test.com",
+    "is_anomaly": false,
+    "anomaly_score": 0.4,
+    "risk_level": "MEDIUM",
+    "contributing_factors": [
+      "Unusual access time (late night/early morning)",
+      "High file access ratio (potential data exfiltration)"
+    ],
+    "model_votes": {
+      "heuristic_fallback": 1
+    },
+    "timestamp": "2026-03-23T13:13:11.598033"
+  },
+  {
+    "user_id": "alice@company.com",
+    "is_anomaly": false,
+    "anomaly_score": 0.0,
+    "risk_level": "LOW",
+    "contributing_factors": [],
+    "model_votes": {
+      "heuristic_fallback": 1
+    },
+    "timestamp": "2026-03-23T13:13:11.629453"
+  },
+  {
+    "user_id": "suspicious@test.com",
+    "is_anomaly": false,
+    "anomaly_score": 0.4,
+    "risk_level": "MEDIUM",
+    "contributing_factors": [
+      "Unusual access time (late night/early morning)",
+      "High file access ratio (potential data exfiltration)"
+    ],
+    "model_votes": {
+      "heuristic_fallback": 1
+    },
+    "timestamp": "2026-03-23T13:13:14.929254"
+  },
+  {
+    "user_id": "alice@company.com",
+    "is_anomaly": false,
+    "anomaly_score": 0.0,
+    "risk_level": "LOW",
+    "contributing_factors": [],
+    "model_votes": {
+      "heuristic_fallback": 1
+    },
+    "timestamp": "2026-03-23T13:13:14.936823"
+  },
+  {
+    "user_id": "suspicious@test.com",
+    "is_anomaly": false,
+    "anomaly_score": 0.4,
+    "risk_level": "MEDIUM",
+    "contributing_factors": [
+      "Unusual access time (late night/early morning)",
+      "High file access ratio (potential data exfiltration)"
+    ],
+    "model_votes": {
+      "heuristic_fallback": 1
+    },
+    "timestamp": "2026-03-23T13:13:26.394464"
+  },
+  {
+    "user_id": "alice@company.com",
+    "is_anomaly": false,
+    "anomaly_score": 0.0,
+    "risk_level": "LOW",
+    "contributing_factors": [],
+    "model_votes": {
+      "heuristic_fallback": 1
+    },
+    "timestamp": "2026-03-23T13:13:26.404103"
+  }
+]

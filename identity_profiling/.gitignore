@@ -18,8 +18,7 @@ models/*.h5
 models/*.pt
 models/*.pth
 
-# ── Dataset (may contain sensitive/licensed data) ────────────────────────────
-data/
+
 
 # ── Jupyter Notebooks checkpoints ────────────────────────────────────────────
 notebooks/.ipynb_checkpoints/
@@ -39,4 +38,7 @@ logs/
 Thumbs.db
 .vscode/
 .idea/
+
+# ── Large data files (exceeds GitHub 100 MB limit) ───────────────────────────
+data/cert_subset_100/logon.csv
 
