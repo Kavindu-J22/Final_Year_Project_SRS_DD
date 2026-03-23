@@ -155,7 +155,8 @@ State is reset on each `POST /analyze` call.
 ## 9. How to Start
 ```powershell
 cd forensic_timeline
-.\.venv\Scripts\python -m uvicorn main:app --host 0.0.0.0 --port 8004 --reload
+cd src
+..\..\forensic_timeline\.venv\Scripts\python -m uvicorn main:app --host 0.0.0.0 --port 8004 --reload
 # Note: main.py is inside src/, so run from the forensic_timeline root
 # Swagger UI: http://localhost:8004/docs
 ```
