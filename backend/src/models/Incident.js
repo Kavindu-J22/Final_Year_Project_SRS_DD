@@ -18,7 +18,7 @@ const incidentSchema = new mongoose.Schema(
     // ── Lifecycle ─────────────────────────────────────────────────────────────
     status: {
       type: String,
-      enum: ['open', 'investigating', 'resolved', 'false_positive'],
+      enum: ['open', 'investigating', 'contained', 'resolved', 'false_positive'],
       default: 'open',
       index: true,
     },

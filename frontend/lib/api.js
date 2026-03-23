@@ -82,5 +82,11 @@ export const dashboardAPI = {
   getRecent:  () => API.get('/dashboard/recent'),
 };
 
+// ── System Test ───────────────────────────────────────────────────────────────
+export const systemAPI = {
+  runSmokeTest: () => API.post('/system/smoke-test'),
+  seedDemo:     () => API.post('/system/seed-demo'),
+};
+
 export default API;
 

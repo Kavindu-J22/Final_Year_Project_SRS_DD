@@ -56,21 +56,27 @@ export default function IncidentCard({ incident, onStatusChange }) {
           {incident.affectedUser && (
             <span className="flex items-center gap-1"><User className="w-3 h-3" /> {incident.affectedUser}</span>
           )}
-          {incident.sourceIp && (
-            <span className="font-hash">{incident.sourceIp}</span>
+          {(incident.metadata?.sourceIp || incident.sourceIp) && (
+            <span className="font-hash">{incident.metadata?.sourceIp ?? incident.sourceIp}</span>
           )}
         </div>
 
         {/* MITRE ATT&CK tags */}
-        {incident.mitreAttack?.length > 0 && (
+        {incident.mitreAttackTechnique && (
           <div className="flex flex-wrap gap-1.5 mt-3">
-            {incident.mitreAttack.map((t) => (
-              <span key={t.techniqueId ?? t}
-                className="flex items-center gap-1 text-[10px] bg-blue-500/10 border border-blue-500/20 text-blue-400 px-2 py-0.5 rounded font-mono">
-                <Tag className="w-2.5 h-2.5" />
-                {t.techniqueId ?? t} {t.name ? `· ${t.name}` : ''}
-              </span>
-            ))}
+            {incident.mitreAttackTechnique.split(',').map((t) => {
+              const trimmed = t.trim();
+              const match   = trimmed.match(/^(T[0-9.]+)\s*[-–]?\s*(.*)$/);
+              const id      = match ? match[1] : trimmed;
+              const name    = match ? match[2].trim() : '';
+              return (
+                <span key={id}
+                  className="flex items-center gap-1 text-[10px] bg-blue-500/10 border border-blue-500/20 text-blue-400 px-2 py-0.5 rounded font-mono">
+                  <Tag className="w-2.5 h-2.5" />
+                  {id}{name ? ` · ${name}` : ''}
+                </span>
+              );
+            })}
           </div>
         )}
 
@@ -101,23 +107,23 @@ export default function IncidentCard({ incident, onStatusChange }) {
       {/* Expanded details */}
       {expanded && (
         <div className="border-t border-slate-800/60 px-4 py-3 space-y-2 bg-slate-900/30">
-          {incident.correlatedEvents?.length > 0 && (
+          {incident.sourceEvents?.length > 0 && (
             <div>
-              <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Correlated Events ({incident.correlatedEvents.length})</p>
+              <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Source Events ({incident.sourceEvents.length})</p>
               <div className="space-y-1 max-h-32 overflow-y-auto pr-1">
-                {incident.correlatedEvents.map((ev, i) => (
+                {incident.sourceEvents.map((ev, i) => (
                   <div key={i} className="font-hash text-[11px] text-slate-400 bg-slate-800/40 rounded px-2 py-1">
-                    {ev.sourceIp ?? ev.eventType ?? JSON.stringify(ev)}
+                    {typeof ev === 'string' ? ev : (ev.sourceIp ?? ev.eventType ?? JSON.stringify(ev))}
                   </div>
                 ))}
               </div>
             </div>
           )}
-          {incident.recommendedActions?.length > 0 && (
+          {incident.recommendations?.length > 0 && (
             <div>
               <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Recommended Actions</p>
               <ul className="space-y-0.5">
-                {incident.recommendedActions.map((a, i) => (
+                {incident.recommendations.map((a, i) => (
                   <li key={i} className="text-[11px] text-slate-400 flex items-start gap-1.5">
                     <span className="text-cyan-500 mt-0.5">›</span> {a}
                   </li>

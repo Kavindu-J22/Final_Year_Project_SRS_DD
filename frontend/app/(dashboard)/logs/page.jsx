@@ -1,9 +1,9 @@
 'use client';
 import { useState, useEffect, useCallback } from 'react';
-import { Search, Filter, Upload, ChevronLeft, ChevronRight, X } from 'lucide-react';
+import { Search, Filter, Upload, ChevronLeft, ChevronRight, X, DatabaseZap } from 'lucide-react';
 import Navbar from '@/components/layout/Navbar';
 import LogTable from '@/components/logs/LogTable';
-import { logsAPI } from '@/lib/api';
+import { logsAPI, systemAPI } from '@/lib/api';
 
 const PAGE_SIZE = 20;
 
@@ -12,8 +12,24 @@ export default function LogsPage() {
   const [total,      setTotal]      = useState(0);
   const [page,       setPage]       = useState(1);
   const [loading,    setLoading]    = useState(true);
+  const [seeding,    setSeeding]    = useState(false);
+  const [seedMsg,    setSeedMsg]    = useState(null);
   const [selected,   setSelected]   = useState(null);
   const [filters,    setFilters]    = useState({ search: '', riskLevel: '', anomalyOnly: false });
+
+  const handleSeedDemo = async () => {
+    setSeeding(true);
+    setSeedMsg(null);
+    try {
+      const { data } = await systemAPI.seedDemo();
+      setSeedMsg({ ok: true, text: `✓ ${data.logs.upserted + data.logs.modified} logs & ${data.incidents.upserted + data.incidents.modified} incidents loaded.` });
+      fetchLogs();
+    } catch (e) {
+      setSeedMsg({ ok: false, text: `✗ Seed failed: ${e.response?.data?.message ?? e.message}` });
+    } finally {
+      setSeeding(false);
+    }
+  };
 
   const fetchLogs = useCallback(async () => {
     setLoading(true);
@@ -80,7 +96,28 @@ export default function LogsPage() {
           >
             ⚠ Anomalies Only
           </button>
+
+          {/* Load Demo Data */}
+          <button
+            onClick={handleSeedDemo}
+            disabled={seeding}
+            className="flex items-center gap-2 px-3 py-2 rounded-lg border border-cyan-500/30 bg-cyan-500/10 text-cyan-400 text-sm font-medium hover:bg-cyan-500/20 transition-all disabled:opacity-50 ml-auto"
+          >
+            <DatabaseZap className={`w-4 h-4 ${seeding ? 'animate-pulse' : ''}`} />
+            {seeding ? 'Loading…' : 'Load Demo Data'}
+          </button>
         </div>
+
+        {/* Seed feedback */}
+        {seedMsg && (
+          <div className={`text-xs px-3 py-2 rounded-lg border ${
+            seedMsg.ok
+              ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+              : 'bg-red-500/10 border-red-500/30 text-red-400'
+          }`}>
+            {seedMsg.text}
+          </div>
+        )}
 
         {/* Stats bar */}
         <div className="flex items-center gap-4 text-xs text-slate-500">

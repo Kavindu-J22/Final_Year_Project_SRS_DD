@@ -13,6 +13,7 @@ const logRoutes      = require('./src/routes/logs');
 const incidentRoutes = require('./src/routes/incidents');
 const forensicsRoutes= require('./src/routes/forensics');
 const dashboardRoutes= require('./src/routes/dashboard');
+const systemRoutes   = require('./src/routes/systemTest');
 
 const app = express();
 
@@ -35,6 +36,7 @@ app.use('/api/logs',      logRoutes);
 app.use('/api/incidents', incidentRoutes);
 app.use('/api/forensics', forensicsRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/system',    systemRoutes);
 
 // ── Health ────────────────────────────────────────────────────────────────────
 app.get('/health', (_req, res) =>

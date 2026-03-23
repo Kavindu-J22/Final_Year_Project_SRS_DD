@@ -1,9 +1,9 @@
 'use client';
 import { useState, useEffect, useCallback } from 'react';
-import { Filter, RefreshCw, AlertTriangle, ShieldCheck } from 'lucide-react';
+import { Filter, RefreshCw, AlertTriangle, ShieldCheck, DatabaseZap } from 'lucide-react';
 import Navbar from '@/components/layout/Navbar';
 import IncidentCard from '@/components/incidents/IncidentCard';
-import { incidentsAPI } from '@/lib/api';
+import { incidentsAPI, systemAPI } from '@/lib/api';
 
 const SEVERITIES = ['', 'CRITICAL', 'HIGH', 'MEDIUM', 'LOW'];
 const STATUSES   = ['', 'open', 'investigating', 'contained', 'resolved'];
@@ -11,9 +11,25 @@ const STATUSES   = ['', 'open', 'investigating', 'contained', 'resolved'];
 export default function IncidentsPage() {
   const [incidents, setIncidents] = useState([]);
   const [loading,   setLoading]   = useState(true);
+  const [seeding,   setSeeding]   = useState(false);
+  const [seedMsg,   setSeedMsg]   = useState(null);
   const [severity,  setSeverity]  = useState('');
   const [status,    setStatus]    = useState('');
   const [counts,    setCounts]    = useState({});
+
+  const handleSeedDemo = async () => {
+    setSeeding(true);
+    setSeedMsg(null);
+    try {
+      const { data } = await systemAPI.seedDemo();
+      setSeedMsg({ ok: true, text: `✓ ${data.logs.upserted + data.logs.modified} logs & ${data.incidents.upserted + data.incidents.modified} incidents loaded.` });
+      fetchIncidents();
+    } catch (e) {
+      setSeedMsg({ ok: false, text: `✗ Seed failed: ${e.response?.data?.message ?? e.message}` });
+    } finally {
+      setSeeding(false);
+    }
+  };
 
   const fetchIncidents = useCallback(async () => {
     setLoading(true);
@@ -95,12 +111,33 @@ export default function IncidentsPage() {
           <button
             onClick={fetchIncidents}
             disabled={loading}
-            className="btn-ghost flex items-center gap-2 text-sm ml-auto"
+            className="btn-ghost flex items-center gap-2 text-sm"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
             Refresh
           </button>
+
+          {/* Load Demo Data */}
+          <button
+            onClick={handleSeedDemo}
+            disabled={seeding}
+            className="flex items-center gap-2 px-3 py-2 rounded-lg border border-cyan-500/30 bg-cyan-500/10 text-cyan-400 text-sm font-medium hover:bg-cyan-500/20 transition-all disabled:opacity-50 ml-auto"
+          >
+            <DatabaseZap className={`w-4 h-4 ${seeding ? 'animate-pulse' : ''}`} />
+            {seeding ? 'Loading…' : 'Load Demo Data'}
+          </button>
         </div>
+
+        {/* Seed feedback */}
+        {seedMsg && (
+          <div className={`text-xs px-3 py-2 rounded-lg border ${
+            seedMsg.ok
+              ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+              : 'bg-red-500/10 border-red-500/30 text-red-400'
+          }`}>
+            {seedMsg.text}
+          </div>
+        )}
 
         {/* Incident count */}
         <p className="text-xs text-slate-600">

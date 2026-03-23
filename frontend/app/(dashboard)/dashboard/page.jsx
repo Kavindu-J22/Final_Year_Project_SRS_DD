@@ -1,27 +1,38 @@
 'use client';
 import { useState, useEffect, useCallback } from 'react';
-import { RefreshCw, ShieldCheck, Activity } from 'lucide-react';
+import { RefreshCw, ShieldCheck, Activity, CheckCircle, XCircle, FlaskConical } from 'lucide-react';
+import Link from 'next/link';
 import Navbar from '@/components/layout/Navbar';
 import MetricsGrid from '@/components/dashboard/MetricsGrid';
 import ForensicTimeline from '@/components/dashboard/ForensicTimeline';
 import ThreatActivityChart from '@/components/dashboard/ThreatActivityChart';
 import { dashboardAPI } from '@/lib/api';
 
+const ML_SERVICES = [
+  { key: 'identity_profiling',   label: 'Identity Profiling',   port: 8001, color: 'cyan' },
+  { key: 'incident_detection',   label: 'Incident Detection',   port: 8002, color: 'amber' },
+  { key: 'evidence_preservation',label: 'Evidence Preservation',port: 8003, color: 'purple' },
+  { key: 'forensic_timeline',    label: 'Forensic Timeline',    port: 8004, color: 'emerald' },
+];
+
 export default function DashboardPage() {
   const [stats,     setStats]     = useState(null);
   const [recent,    setRecent]    = useState(null);
+  const [mlHealth,  setMlHealth]  = useState(null);
   const [loading,   setLoading]   = useState(true);
   const [refreshed, setRefreshed] = useState(null);
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
     try {
-      const [statsRes, recentRes] = await Promise.all([
+      const [statsRes, recentRes, healthRes] = await Promise.allSettled([
         dashboardAPI.getStats(),
         dashboardAPI.getRecent(),
+        dashboardAPI.getMlHealth(),
       ]);
-      setStats(statsRes.data.data);
-      setRecent(recentRes.data.data);
+      if (statsRes.status  === 'fulfilled') setStats(statsRes.value.data.data);
+      if (recentRes.status === 'fulfilled') setRecent(recentRes.value.data.data);
+      if (healthRes.status === 'fulfilled') setMlHealth(healthRes.value.data);
       setRefreshed(new Date());
     } catch (err) {
       console.error('Dashboard fetch error', err);
@@ -85,6 +96,45 @@ export default function DashboardPage() {
                 : null}
               isDemo={isDemo}
             />
+          </div>
+        </div>
+
+        {/* ML Service Health */}
+        <div className="glass-card p-5">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Activity className="w-4 h-4 text-cyan-400" />
+              <h3 className="text-sm font-semibold text-slate-200">ML Service Health</h3>
+              {mlHealth?.allServicesOnline && (
+                <span className="text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded font-mono">ALL ONLINE</span>
+              )}
+            </div>
+            <Link href="/system-test" className="text-[10px] text-cyan-400 hover:text-cyan-300 font-mono transition-colors">
+              Run Tests →
+            </Link>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {ML_SERVICES.map(({ key, label, port, color }) => {
+              const svc = mlHealth?.services?.[key];
+              const online = svc?.status === 'online';
+              return (
+                <div key={key} className={`p-3 rounded-lg border text-center ${
+                  loading ? 'border-slate-800 bg-slate-900/40' :
+                  online ? `bg-${color}-500/5 border-${color}-500/20` : 'bg-red-500/5 border-red-500/20'
+                }`}>
+                  {loading
+                    ? <div className="w-5 h-5 mx-auto mb-2 rounded-full bg-slate-700 animate-pulse"/>
+                    : online
+                      ? <CheckCircle className={`w-5 h-5 mx-auto mb-2 text-${color}-400`}/>
+                      : <XCircle    className="w-5 h-5 mx-auto mb-2 text-red-400"/>
+                  }
+                  <p className="text-[10px] text-slate-400 font-medium leading-tight">{label}</p>
+                  <p className="text-[9px] font-mono text-slate-600 mt-0.5">
+                    :{port} · {loading ? '…' : (online ? 'ONLINE' : 'OFFLINE')}
+                  </p>
+                </div>
+              );
+            })}
           </div>
         </div>
 

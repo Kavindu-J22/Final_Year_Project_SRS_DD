@@ -70,9 +70,9 @@ export default function LogTable({ logs, loading, onSelect }) {
         <thead className="border-b border-slate-800/80">
           <tr>
             <TH col="timestamp"  label="Timestamp" />
-            <TH col="sourceIp"   label="Source IP" />
-            <TH col="action"     label="Action / Event" />
-            <TH col="service"    label="Service" />
+            <TH col="ipAddress"  label="Source IP" />
+            <TH col="url"        label="Action / Event" />
+            <TH col="eventType"  label="Service / Type" />
             <TH col="riskLevel"  label="Risk" />
             <TH col="isAnomaly"  label="Anomaly" />
             <th className="px-4 py-3" />
@@ -94,13 +94,13 @@ export default function LogTable({ logs, loading, onSelect }) {
                 {log.timestamp ? new Date(log.timestamp).toLocaleString('en-GB') : '—'}
               </td>
               <td className="px-4 py-3 font-hash text-slate-300 whitespace-nowrap text-[12px]">
-                {log.sourceIp ?? '—'}
+                {log.ipAddress ?? log.sourceIp ?? '—'}
               </td>
-              <td className="px-4 py-3 text-slate-300 max-w-xs truncate">
-                {log.action ?? log.eventType ?? '—'}
+              <td className="px-4 py-3 text-slate-300 max-w-xs truncate" title={log.url}>
+                {log.url ?? log.action ?? log.eventType ?? '—'}
               </td>
               <td className="px-4 py-3 text-slate-500 text-xs whitespace-nowrap">
-                {log.service ?? log.resourceType ?? '—'}
+                {log.eventType ?? log.source ?? log.service ?? '—'}
               </td>
               <td className="px-4 py-3">
                 {log.riskLevel
