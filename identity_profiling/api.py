@@ -12,6 +12,7 @@ from typing import List, Dict, Optional
 import joblib
 import numpy as np
 import os
+import json
 from datetime import datetime
 
 app = FastAPI(
@@ -69,6 +70,28 @@ def load_ensemble_models():
 
 MODELS = load_ensemble_models()
 
+# ── History persistence ────────────────────────────────────────────────────────
+HISTORY_PATH = os.path.join(os.path.dirname(__file__), "data", "history.json")
+os.makedirs(os.path.dirname(HISTORY_PATH), exist_ok=True)
+
+def load_history() -> List[dict]:
+    if not os.path.exists(HISTORY_PATH):
+        return []
+    try:
+        with open(HISTORY_PATH, "r") as f:
+            return json.load(f)
+    except Exception:
+        return []
+
+def save_history(history: List[dict]):
+    try:
+        with open(HISTORY_PATH, "w") as f:
+            json.dump(history[-2000:], f, indent=2)
+    except Exception as e:
+        print(f"Error saving history: {e}")
+
+ANALYSIS_HISTORY: List[dict] = load_history()
+
 # Feature extraction
 def session_to_features(session: UserSession) -> np.ndarray:
     geo_encoded = 0 if session.geographic_location == "USA" else 1
@@ -108,32 +131,44 @@ async def root():
 
 @app.post("/analyze", response_model=AnalysisResult)
 async def analyze_session(session: UserSession):
-    if not MODELS:
-        raise HTTPException(status_code=503, detail="ML models not loaded")
-    
-    features = session_to_features(session)
     votes, anomaly_count = {}, 0
-    
-    # Ensemble voting: get predictions from all models
-    for model_name, model in MODELS.items():
-        try:
-            prediction = model.predict(features)[0]
-            is_anomaly = prediction == -1  # sklearn convention
-            votes[model_name] = -1 if is_anomaly else 1
-            if is_anomaly: anomaly_count += 1
-        except Exception as e:
-            print(f"Error with {model_name}: {e}")
-    
-    total_models = len(votes)
-    is_anomaly = anomaly_count >= (total_models / 2)
-    anomaly_score = anomaly_count / total_models if total_models > 0 else 0.0
+
+    if MODELS:
+        features = session_to_features(session)
+        # Ensemble voting: get predictions from all models
+        for model_name, model in MODELS.items():
+            try:
+                prediction = model.predict(features)[0]
+                is_anomaly = prediction == -1  # sklearn convention
+                votes[model_name] = -1 if is_anomaly else 1
+                if is_anomaly: anomaly_count += 1
+            except Exception as e:
+                print(f"Error with {model_name}: {e}")
+        total_models = len(votes)
+        is_anomaly = anomaly_count >= (total_models / 2)
+        anomaly_score = anomaly_count / total_models if total_models > 0 else 0.0
+    else:
+        # Heuristic fallback when no models are loaded
+        factors_tmp = analyze_contributing_factors(session, 0.0)
+        anomaly_score = min(len(factors_tmp) * 0.2, 0.95)
+        is_anomaly = anomaly_score >= 0.5
+        votes = {"heuristic_fallback": -1 if is_anomaly else 1}
+
     factors = analyze_contributing_factors(session, anomaly_score)
     
-    return AnalysisResult(
+    result = AnalysisResult(
         user_id=session.user_id, is_anomaly=is_anomaly, anomaly_score=anomaly_score,
         risk_level=get_risk_level(anomaly_score), contributing_factors=factors,
         model_votes=votes, timestamp=datetime.utcnow().isoformat()
     )
+    ANALYSIS_HISTORY.append(result.dict())
+    save_history(ANALYSIS_HISTORY)
+    return result
+
+@app.get("/history", response_model=List[AnalysisResult])
+async def get_history(limit: int = 100):
+    """Return the last N analysis results (default 100)"""
+    return ANALYSIS_HISTORY[-limit:]
 
 @app.get("/models/status", response_model=List[ModelStatus])
 async def get_model_status():

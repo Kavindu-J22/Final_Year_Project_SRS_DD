@@ -105,5 +105,38 @@ router.post('/identity/analyze', protect, async (req, res) => {
   }
 });
 
+// ── GET /api/forensics/identity/history ──────────────────────────────────────
+router.get('/identity/history', protect, async (req, res) => {
+  const limit = parseInt(req.query.limit) || 100;
+  try {
+    const data = await identityService.getHistory(limit);
+    res.json({ success: true, data });
+  } catch (err) {
+    res.status(503).json({ success: false, message: 'Identity service unavailable.', error: err.message });
+  }
+});
+
+// ── GET /api/forensics/timeline/metrics ──────────────────────────────────────
+router.get('/timeline/metrics', protect, async (req, res) => {
+  try {
+    const data = await timelineService.getMetrics();
+    res.json({ success: true, data });
+  } catch (err) {
+    res.status(503).json({ success: false, message: 'Timeline service unavailable.', error: err.message });
+  }
+});
+
+// ── GET /api/forensics/timeline/search/:entity ───────────────────────────────
+router.get('/timeline/search/:entity', protect, async (req, res) => {
+  const { entity } = req.params;
+  const { field = 'ip_address' } = req.query;
+  try {
+    const data = await timelineService.searchEntity(entity, field);
+    res.json({ success: true, data });
+  } catch (err) {
+    res.status(503).json({ success: false, message: 'Timeline service unavailable.', error: err.message });
+  }
+});
+
 module.exports = router;
 

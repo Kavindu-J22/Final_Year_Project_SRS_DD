@@ -245,6 +245,63 @@ async def get_anomalies():
     
     return ANOMALIES
 
+@app.get("/metrics")
+async def get_metrics():
+    """Return aggregate metrics from the last analysis run."""
+    total = len(ANALYZED_LOGS)
+    anomaly_count = len(ANOMALIES)
+    cluster_count = len([c for c in CLUSTERS if c.cluster_id != -1])
+    top_ips: Dict[str, int] = {}
+    method_dist: Dict[str, int] = {}
+    status_dist: Dict[str, int] = {}
+    for log in ANALYZED_LOGS:
+        top_ips[log.ip_address] = top_ips.get(log.ip_address, 0) + 1
+        method_dist[log.method] = method_dist.get(log.method, 0) + 1
+        key = str(log.status_code)
+        status_dist[key] = status_dist.get(key, 0) + 1
+    sorted_ips = sorted(top_ips.items(), key=lambda x: x[1], reverse=True)[:10]
+    noise_ratio = round(anomaly_count / total, 4) if total > 0 else 0.0
+    return {
+        "total_logs": total,
+        "total_anomalies": anomaly_count,
+        "num_clusters": cluster_count,
+        "noise_ratio": noise_ratio,
+        "top_ips": [{"ip": ip, "count": cnt} for ip, cnt in sorted_ips],
+        "method_distribution": method_dist,
+        "status_distribution": status_dist,
+    }
+
+@app.get("/search/{entity}")
+async def search_entity(entity: str, field: str = "ip_address"):
+    """
+    Search analyzed logs for a specific entity value.
+    field: ip_address | method | url | user_agent
+    """
+    allowed_fields = {"ip_address", "method", "url", "user_agent"}
+    if field not in allowed_fields:
+        raise HTTPException(status_code=400, detail=f"field must be one of {allowed_fields}")
+    if not ANALYZED_LOGS:
+        raise HTTPException(status_code=404, detail="No analysis has been performed yet")
+
+    entity_lower = entity.lower()
+    matches = []
+    for log in ANALYZED_LOGS:
+        val = getattr(log, field, None) or ""
+        if entity_lower in str(val).lower():
+            # check if this log is an anomaly
+            is_anom = any(a.log_id == log.log_id for a in ANOMALIES)
+            matches.append({
+                "log_id": log.log_id,
+                "timestamp": log.timestamp,
+                "ip_address": log.ip_address,
+                "method": log.method,
+                "url": log.url,
+                "status_code": log.status_code,
+                "user_agent": log.user_agent,
+                "is_anomaly": is_anom,
+            })
+    return {"entity": entity, "field": field, "matches": matches, "count": len(matches)}
+
 @app.get("/sample-data/normal", response_model=List[LogEntry])
 async def get_normal_sample():
     """Get sample normal traffic logs"""

@@ -103,6 +103,61 @@ router.get('/ml', protect, async (req, res) => {
   }
 });
 
+// ── GET /api/incidents/rules ──────────────────────────────────────────────────
+router.get('/rules', protect, async (req, res) => {
+  try {
+    const data = await incidentService.getRules();
+    res.json({ success: true, data });
+  } catch (err) {
+    res.status(503).json({ success: false, message: 'Incident service unavailable.', error: err.message });
+  }
+});
+
+// ── GET /api/incidents/store ──────────────────────────────────────────────────
+router.get('/store', protect, async (req, res) => {
+  try {
+    const data = await incidentService.getRuleStore();
+    res.json({ success: true, data });
+  } catch (err) {
+    res.status(503).json({ success: false, message: 'Incident service unavailable.', error: err.message });
+  }
+});
+
+// ── POST /api/incidents/import-rules ─────────────────────────────────────────
+router.post('/import-rules', protect, async (req, res) => {
+  const { rules } = req.body;
+  if (!rules || !Array.isArray(rules)) {
+    return res.status(400).json({ success: false, message: '`rules` array is required.' });
+  }
+  try {
+    const data = await incidentService.importRules(rules);
+    res.json({ success: true, data });
+  } catch (err) {
+    res.status(503).json({ success: false, message: 'Incident service unavailable.', error: err.message });
+  }
+});
+
+// ── GET /api/incidents/export-rules ──────────────────────────────────────────
+router.get('/export-rules', protect, async (req, res) => {
+  try {
+    const data = await incidentService.exportRules();
+    res.json({ success: true, data });
+  } catch (err) {
+    res.status(503).json({ success: false, message: 'Incident service unavailable.', error: err.message });
+  }
+});
+
+// ── DELETE /api/incidents/rules/:ruleId ──────────────────────────────────────
+router.delete('/rules/:ruleId', protect, async (req, res) => {
+  try {
+    const data = await incidentService.deleteRule(req.params.ruleId);
+    res.json({ success: true, data });
+  } catch (err) {
+    const status = err.response?.status === 404 ? 404 : 503;
+    res.status(status).json({ success: false, message: err.message });
+  }
+});
+
 // ── PATCH /api/incidents/:id/status ──────────────────────────────────────────
 router.patch('/:id/status', protect, async (req, res) => {
   const { status } = req.body;

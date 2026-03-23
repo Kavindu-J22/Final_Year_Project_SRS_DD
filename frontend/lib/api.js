@@ -50,21 +50,29 @@ export const logsAPI = {
 
 // ── Incidents ─────────────────────────────────────────────────────────────────
 export const incidentsAPI = {
-  getAll:     (params)                => API.get('/incidents',               { params }),
-  correlate:  (events, windowMins)    => API.post('/incidents/correlate',    { events, timeWindowMinutes: windowMins }),
-  getML:      ()                      => API.get('/incidents/ml'),
-  setStatus:  (id, status)            => API.patch(`/incidents/${id}/status`, { status }),
+  getAll:       (params)             => API.get('/incidents',                { params }),
+  correlate:    (events, windowMins) => API.post('/incidents/correlate',     { events, timeWindowMinutes: windowMins }),
+  getML:        ()                   => API.get('/incidents/ml'),
+  setStatus:    (id, status)         => API.patch(`/incidents/${id}/status`, { status }),
+  getRules:     ()                   => API.get('/incidents/rules'),
+  getRuleStore: ()                   => API.get('/incidents/store'),
+  importRules:  (rules)              => API.post('/incidents/import-rules',  { rules }),
+  exportRules:  ()                   => API.get('/incidents/export-rules'),
+  deleteRule:   (ruleId)             => API.delete(`/incidents/rules/${ruleId}`),
 };
 
 // ── Forensics ─────────────────────────────────────────────────────────────────
 export const forensicsAPI = {
-  preserve:          (body) => API.post('/forensics/preserve',          body),
-  verify:            ()     => API.post('/forensics/verify'),
-  getChain:          ()     => API.get('/forensics/chain'),
-  getStats:          ()     => API.get('/forensics/stats'),
-  analyzeTimeline:   (logs) => API.post('/forensics/timeline/analyze',  { logs }),
-  getAnomalies:      ()     => API.get('/forensics/timeline/anomalies'),
-  analyzeIdentity:   (body) => API.post('/forensics/identity/analyze',  body),
+  preserve:          (body)           => API.post('/forensics/preserve',                    body),
+  verify:            ()               => API.post('/forensics/verify'),
+  getChain:          ()               => API.get('/forensics/chain'),
+  getStats:          ()               => API.get('/forensics/stats'),
+  analyzeTimeline:   (logs)           => API.post('/forensics/timeline/analyze',            { logs }),
+  getAnomalies:      ()               => API.get('/forensics/timeline/anomalies'),
+  getTimelineMetrics:()               => API.get('/forensics/timeline/metrics'),
+  searchEntity:      (entity, field)  => API.get(`/forensics/timeline/search/${encodeURIComponent(entity)}`, { params: { field } }),
+  analyzeIdentity:   (body)           => API.post('/forensics/identity/analyze',            body),
+  getIdentityHistory:(limit = 100)    => API.get('/forensics/identity/history',             { params: { limit } }),
 };
 
 // ── Dashboard ─────────────────────────────────────────────────────────────────

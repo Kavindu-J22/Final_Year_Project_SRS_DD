@@ -3,7 +3,8 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
   LayoutDashboard, FileText, AlertTriangle, Search, LogOut,
-  Shield, Activity, ChevronLeft, ChevronRight,
+  Shield, Activity, ChevronLeft, ChevronRight, Clock, BookOpen,
+  ShoppingBag, History,
 } from 'lucide-react';
 import { useState } from 'react';
 import clsx from 'clsx';
@@ -13,6 +14,10 @@ const NAV = [
   { href: '/logs',      icon: FileText,         label: 'Log Viewer',     sub: 'DBSCAN Clustering' },
   { href: '/incidents', icon: AlertTriangle,    label: 'Incidents',      sub: 'MITRE ATT&CK' },
   { href: '/forensics', icon: Search,           label: 'Forensics',      sub: 'Digital Notary' },
+  { href: '/timeline',  icon: Clock,            label: 'Timeline',       sub: 'Entity Search' },
+  { href: '/history',   icon: History,          label: 'Identity Log',   sub: 'Behaviour History' },
+  { href: '/rules',     icon: BookOpen,         label: 'Detection Rules', sub: 'MITRE Rulebase' },
+  { href: '/store',     icon: ShoppingBag,      label: 'Rule Store',     sub: 'Rule Marketplace' },
 ];
 
 export default function Sidebar() {

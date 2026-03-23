@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field
 from typing import List, Dict, Optional, Any
 from datetime import datetime
 from collections import deque
-import yaml, os
+import yaml, os, json
 
 app = FastAPI(
     title="Incident Detection & Correlation API",
@@ -46,6 +46,9 @@ class RuleInfo(BaseModel):
     severity: str
     mitre_technique: str
     description: str
+
+class RuleImport(BaseModel):
+    rules: List[Dict[str, Any]] = Field(..., description="List of rule objects to import")
 
 class CorrelationRequest(BaseModel):
     events: List[LogEvent] = Field(..., min_length=2)
@@ -182,6 +185,75 @@ async def get_rules():
         severity=rule.get("severity", "MEDIUM"), mitre_technique=rule.get("mitre_technique", "N/A"),
         description=rule.get("description", "No description")
     ) for rule in RULES_CACHE]
+
+@app.get("/store", response_model=List[Dict[str, Any]])
+async def get_rule_store():
+    """Return the catalogue of all available detection rules (active + importable)."""
+    store = [
+        {"rule_id": "T1110.001", "name": "Password Spraying", "severity": "HIGH",
+         "mitre_technique": "T1110.001", "category": "Credential Access",
+         "description": "Adversary uses a single password against many accounts.",
+         "threshold": 10, "time_window": 60, "installed": any(r.get("rule_id") == "T1110.001" for r in RULES_CACHE)},
+        {"rule_id": "T1059", "name": "Command & Scripting Interpreter", "severity": "MEDIUM",
+         "mitre_technique": "T1059", "category": "Execution",
+         "description": "Suspicious script or shell command execution detected.",
+         "threshold": 3, "time_window": 120, "installed": any(r.get("rule_id") == "T1059" for r in RULES_CACHE)},
+        {"rule_id": "T1021", "name": "Remote Services Abuse", "severity": "HIGH",
+         "mitre_technique": "T1021", "category": "Lateral Movement",
+         "description": "Use of remote services (RDP/SSH) from unusual source.",
+         "threshold": 1, "time_window": 60, "installed": any(r.get("rule_id") == "T1021" for r in RULES_CACHE)},
+        {"rule_id": "T1071", "name": "C2 via Standard Protocols", "severity": "CRITICAL",
+         "mitre_technique": "T1071", "category": "Command & Control",
+         "description": "Command-and-control traffic over HTTP/DNS/SMTP.",
+         "threshold": 5, "time_window": 300, "installed": any(r.get("rule_id") == "T1071" for r in RULES_CACHE)},
+        {"rule_id": "T1486", "name": "Ransomware – Data Encrypted", "severity": "CRITICAL",
+         "mitre_technique": "T1486", "category": "Impact",
+         "description": "Mass file encryption activity detected.",
+         "threshold": 1, "time_window": 30, "installed": any(r.get("rule_id") == "T1486" for r in RULES_CACHE)},
+        {"rule_id": "T1110", "name": "Brute Force Attack", "severity": "HIGH",
+         "mitre_technique": "T1110", "category": "Credential Access",
+         "description": "Multiple failed login attempts detected.",
+         "threshold": 5, "time_window": 60, "installed": any(r.get("rule_id") == "T1110" for r in RULES_CACHE)},
+        {"rule_id": "T1078", "name": "Valid Accounts Misuse", "severity": "MEDIUM",
+         "mitre_technique": "T1078", "category": "Defense Evasion",
+         "description": "Unusual access pattern with valid credentials.",
+         "threshold": 1, "time_window": 300, "installed": any(r.get("rule_id") == "T1078" for r in RULES_CACHE)},
+        {"rule_id": "T1485", "name": "Data Destruction", "severity": "CRITICAL",
+         "mitre_technique": "T1485", "category": "Impact",
+         "description": "Bulk deletion or data destruction detected.",
+         "threshold": 1, "time_window": 60, "installed": any(r.get("rule_id") == "T1485" for r in RULES_CACHE)},
+    ]
+    return store
+
+@app.post("/import-rules", response_model=Dict[str, Any])
+async def import_rules(payload: RuleImport):
+    """Import (merge) additional rules into the active rulebase."""
+    global RULES_CACHE
+    added = 0
+    for rule in payload.rules:
+        existing_ids = {r.get("rule_id") for r in RULES_CACHE}
+        if rule.get("rule_id") not in existing_ids:
+            RULES_CACHE.append(rule)
+            added += 1
+        else:
+            # Update existing
+            RULES_CACHE = [rule if r.get("rule_id") == rule.get("rule_id") else r for r in RULES_CACHE]
+    return {"status": "ok", "imported": added, "total_rules": len(RULES_CACHE)}
+
+@app.get("/export-rules")
+async def export_rules():
+    """Export the current active rulebase as JSON."""
+    return {"rules": RULES_CACHE, "total": len(RULES_CACHE), "exported_at": datetime.utcnow().isoformat()}
+
+@app.delete("/rules/{rule_id}", response_model=Dict[str, Any])
+async def delete_rule(rule_id: str):
+    """Remove a rule from the active rulebase by rule_id."""
+    global RULES_CACHE
+    before = len(RULES_CACHE)
+    RULES_CACHE = [r for r in RULES_CACHE if r.get("rule_id") != rule_id]
+    if len(RULES_CACHE) == before:
+        raise HTTPException(status_code=404, detail=f"Rule '{rule_id}' not found")
+    return {"status": "deleted", "rule_id": rule_id, "total_rules": len(RULES_CACHE)}
 
 @app.get("/sample-data/brute-force", response_model=List[LogEvent])
 async def get_brute_force_sample():
