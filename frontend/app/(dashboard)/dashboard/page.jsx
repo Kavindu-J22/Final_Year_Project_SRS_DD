@@ -47,6 +47,15 @@ export default function DashboardPage() {
   const charts     = stats?.charts     ?? {};
   const isDemo     = !stats;
 
+  // Transform logsOverTime [{_id, total, anomalies}] → [{time, normal, attacks}] for the chart
+  const logsChartData = charts.logsOverTime?.length
+    ? charts.logsOverTime.map((d) => ({
+        time:    d._id ?? '',
+        normal:  Math.max(0, (d.total ?? 0) - (d.anomalies ?? 0)),
+        attacks: d.anomalies ?? 0,
+      }))
+    : null;
+
   return (
     <div className="flex flex-col min-h-screen">
       <Navbar
@@ -84,7 +93,7 @@ export default function DashboardPage() {
         {/* Charts row */}
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
           <div className="xl:col-span-2">
-            <ForensicTimeline data={charts.logsOverTime} />
+            <ForensicTimeline data={logsChartData} />
           </div>
           <div>
             <ThreatActivityChart
@@ -155,7 +164,7 @@ export default function DashboardPage() {
                       log?.isAnomaly ? 'bg-red-400' : 'bg-emerald-400'
                     } ${loading ? 'bg-slate-700' : ''}`} />
                     <p className="text-xs text-slate-300 truncate font-mono">
-                      {loading ? '—' : (log?.sourceIp ?? 'N/A')}
+                      {loading ? '—' : (log?.ipAddress ?? 'N/A')}
                     </p>
                   </div>
                   <span className={`text-[10px] px-1.5 py-0.5 rounded font-mono ${
@@ -163,7 +172,7 @@ export default function DashboardPage() {
                       ? 'bg-red-500/10 text-red-400 border border-red-500/20'
                       : 'bg-slate-800 text-slate-500'
                   }`}>
-                    {loading ? '…' : (log?.isAnomaly ? 'ANOMALY' : log?.action ?? '—')}
+                    {loading ? '…' : (log?.isAnomaly ? 'ANOMALY' : log?.eventType ?? '—')}
                   </span>
                 </div>
               ))}

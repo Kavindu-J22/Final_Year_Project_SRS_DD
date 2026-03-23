@@ -91,60 +91,92 @@ function ComponentCard({ meta, result }) {
 }
 
 export default function SystemTestPage() {
-  const [running,  setRunning]  = useState(false);
+  const [running,  setRunning]  = useState(false);   // full-suite running id: 'all' | 1|2|3|4
+  const [activeId, setActiveId] = useState(null);     // which suite is currently running
   const [result,   setResult]   = useState(null);
   const [error,    setError]    = useState(null);
   const [ranAt,    setRanAt]    = useState(null);
 
-  const runTests = async () => {
-    setRunning(true);
-    setError(null);
-    setResult(null);
+  const runAll = async () => {
+    setActiveId('all'); setRunning(true); setError(null); setResult(null);
     try {
       const { data } = await systemAPI.runSmokeTest();
-      setResult(data);
-      setRanAt(new Date());
+      setResult(data); setRanAt(new Date());
     } catch (err) {
       setError(err.response?.data?.message || err.message || 'Failed to reach backend');
-    } finally {
-      setRunning(false);
-    }
+    } finally { setRunning(false); setActiveId(null); }
   };
 
-  const summary = result?.summary;
-  const allPassed = summary?.allPassed;
+  const runComponent = async (id) => {
+    setActiveId(id); setRunning(true); setError(null); setResult(null);
+    try {
+      const { data } = await systemAPI.runComponentTest(id);
+      setResult(data); setRanAt(new Date());
+    } catch (err) {
+      setError(err.response?.data?.message || err.message || 'Failed to reach backend');
+    } finally { setRunning(false); setActiveId(null); }
+  };
+
+  const summary  = result?.summary;
+  const allPassed= summary?.allPassed;
+
+  const SUITE_BTNS = [
+    { id: 1, label: 'Identity',  color: 'cyan',    Icon: ShieldCheck  },
+    { id: 2, label: 'Incidents', color: 'amber',   Icon: AlertTriangle },
+    { id: 3, label: 'Evidence',  color: 'purple',  Icon: Lock         },
+    { id: 4, label: 'Timeline',  color: 'emerald', Icon: Activity     },
+  ];
 
   return (
     <div className="flex flex-col min-h-screen">
-      <Navbar title="System Test Runner" subtitle="Live smoke-test across all 4 ML microservices" />
+      <Navbar title="System Test Runner" subtitle="5 test suites · Live smoke-test across all 4 ML microservices" />
 
       <div className="flex-1 p-6 space-y-6">
-        {/* Control bar */}
-        <div className="flex flex-wrap items-center gap-4">
-          <button
-            onClick={runTests}
-            disabled={running}
-            className="btn-primary flex items-center gap-2"
-          >
-            {running
-              ? <Loader2 className="w-4 h-4 animate-spin"/>
-              : <FlaskConical className="w-4 h-4"/>}
-            {running ? 'Running Tests…' : 'Run Full Smoke Test'}
-          </button>
-
-          {result && !running && (
-            <button onClick={runTests} className="btn-ghost flex items-center gap-2 text-sm">
-              <RefreshCw className="w-3.5 h-3.5"/>Re-run
+        {/* ── Test Suite Selector ── */}
+        <div className="glass-card p-4 space-y-3">
+          <p className="text-[11px] text-slate-500 uppercase tracking-wider font-mono">Select Test Suite</p>
+          <div className="flex flex-wrap gap-3">
+            {/* Suite 1: Full System Test */}
+            <button
+              onClick={runAll}
+              disabled={running}
+              className="btn-primary flex items-center gap-2"
+            >
+              {activeId === 'all' && running
+                ? <Loader2 className="w-4 h-4 animate-spin"/>
+                : <FlaskConical className="w-4 h-4"/>}
+              {activeId === 'all' && running ? 'Running All…' : '① Run All (Full System)'}
             </button>
-          )}
 
-          {ranAt && (
-            <span className="text-xs text-slate-600 font-mono ml-auto">
-              Last run: {ranAt.toLocaleTimeString('en-GB')}
-              {result?.durationMs && ` · ${result.durationMs}ms total`}
-            </span>
-          )}
+            {/* Suites 2–5: per-component */}
+            {SUITE_BTNS.map(({ id, label, color, Icon }, idx) => (
+              <button
+                key={id}
+                onClick={() => runComponent(id)}
+                disabled={running}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg border text-sm font-medium transition-all disabled:opacity-50
+                  border-${color}-500/30 bg-${color}-500/10 text-${color}-400 hover:bg-${color}-500/20`}
+              >
+                {activeId === id && running
+                  ? <Loader2 className="w-3.5 h-3.5 animate-spin"/>
+                  : <Icon className="w-3.5 h-3.5"/>}
+                {activeId === id && running ? 'Running…' : `${['②','③','④','⑤'][idx]} ${label} Only`}
+              </button>
+            ))}
+          </div>
+          <p className="text-[10px] text-slate-600 font-mono">
+            Suite ① runs all 4 components together · Suites ②–⑤ run a single component in isolation
+          </p>
         </div>
+
+        {/* Timestamp */}
+        {ranAt && (
+          <div className="text-right text-xs text-slate-600 font-mono -mt-3">
+            Last run: {ranAt.toLocaleTimeString('en-GB')}
+            {result?.durationMs && ` · ${result.durationMs}ms total`}
+          </div>
+        )}
+
 
         {/* Overall summary banner */}
         {summary && (
@@ -187,10 +219,22 @@ export default function SystemTestPage() {
         {/* How it works */}
         {!result && !running && (
           <div className="glass-card p-5 text-sm text-slate-500 space-y-2">
-            <p className="text-slate-400 font-semibold text-xs uppercase tracking-wider mb-2">How This Works</p>
-            <p>Click <strong className="text-slate-300">Run Full Smoke Test</strong> to fire live test payloads at all 4 ML microservices simultaneously.</p>
-            <p>Each component runs 4 test cases covering health checks, core ML endpoints, and edge-case payloads — giving you instant pass/fail visibility for the research panel demo.</p>
-            <p className="text-[11px] font-mono text-slate-600">Services tested: :8001 Identity · :8002 Incidents · :8003 Evidence · :8004 Timeline</p>
+            <p className="text-slate-400 font-semibold text-xs uppercase tracking-wider mb-2">5 Test Suites Available</p>
+            <div className="grid grid-cols-1 sm:grid-cols-5 gap-3 text-xs text-slate-600 font-mono">
+              {[
+                { num: '①', label: 'Full System',      desc: 'All 4 components in parallel'     },
+                { num: '②', label: 'Identity',         desc: 'Health · Anomaly · Normal session' },
+                { num: '③', label: 'Incident',         desc: 'Health · Rules · Brute-force corr.'},
+                { num: '④', label: 'Evidence',         desc: 'Health · Preserve · Verify · Stats'},
+                { num: '⑤', label: 'Timeline',         desc: 'Health · Analyze · Anomalies · Metrics'},
+              ].map(({ num, label, desc }) => (
+                <div key={num} className="p-3 rounded-lg bg-slate-900/60 border border-slate-800">
+                  <p className="text-slate-400 font-bold text-sm">{num} {label}</p>
+                  <p className="text-[10px] mt-1 text-slate-600">{desc}</p>
+                </div>
+              ))}
+            </div>
+            <p className="text-[10px] font-mono text-slate-600 pt-1">Each suite runs 4 test cases: health check · core ML endpoint · edge-case payload · summary stat</p>
           </div>
         )}
       </div>

@@ -1,5 +1,5 @@
 'use client';
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { Clock, Search, RefreshCw, AlertCircle, BarChart2, Activity } from 'lucide-react';
 import Navbar from '@/components/layout/Navbar';
 import { forensicsAPI } from '@/lib/api';
@@ -56,6 +56,29 @@ export default function TimelinePage() {
   }, [searchTerm, searchField]);
 
   const loadSample = () => setLogs(JSON.stringify(SAMPLE_LOGS, null, 2));
+
+  // Auto-load + analyze on first mount so the page isn't blank
+  useEffect(() => {
+    const autoRun = async () => {
+      setRunning(true); setError('');
+      try {
+        const [analyzeRes, metricsRes] = await Promise.allSettled([
+          forensicsAPI.analyzeTimeline(SAMPLE_LOGS),
+          forensicsAPI.getTimelineMetrics(),
+        ]);
+        if (analyzeRes.status === 'fulfilled') {
+          const d = analyzeRes.value.data?.data ?? analyzeRes.value.data;
+          setClusters(d?.clusters ?? []);
+        }
+        if (metricsRes.status === 'fulfilled') {
+          setMetrics(metricsRes.value.data?.data ?? metricsRes.value.data);
+        }
+      } catch { /* ignore — user can run manually */ }
+      finally { setRunning(false); }
+    };
+    autoRun();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div className="flex flex-col min-h-screen">

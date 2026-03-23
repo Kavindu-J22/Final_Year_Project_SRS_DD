@@ -84,8 +84,9 @@ export const dashboardAPI = {
 
 // ── System Test ───────────────────────────────────────────────────────────────
 export const systemAPI = {
-  runSmokeTest: () => API.post('/system/smoke-test'),
-  seedDemo:     () => API.post('/system/seed-demo'),
+  runSmokeTest:      ()   => API.post('/system/smoke-test'),
+  runComponentTest:  (id) => API.post(`/system/smoke-test/component/${id}`),
+  seedDemo:          ()   => API.post('/system/seed-demo'),
 };
 
 export default API;

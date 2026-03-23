@@ -307,6 +307,33 @@ router.post('/seed-demo', protect, async (req, res) => {
   });
 });
 
+// ── Per-component endpoint ───────────────────────────────────────────────────
+router.post('/smoke-test/component/:id', protect, async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  const testFnMap = { 1: testComponent1, 2: testComponent2, 3: testComponent3, 4: testComponent4 };
+  const metaMap = {
+    1: { name: 'Identity Attribution & Behavior Profiling', port: 8001 },
+    2: { name: 'Incident Detection & Correlation',          port: 8002 },
+    3: { name: 'Evidence Preservation & Chain of Custody',  port: 8003 },
+    4: { name: 'Forensic Timeline Reconstruction',          port: 8004 },
+  };
+  if (!testFnMap[id]) return res.status(400).json({ success: false, message: 'Component id must be 1–4' });
+
+  const t0 = Date.now();
+  const tests   = await testFnMap[id]();
+  const passed  = tests.filter(t => t.status === 'PASS').length;
+  const failed  = tests.filter(t => t.status === 'FAIL').length;
+  const comp    = { id, ...metaMap[id], tests, passed, failed, status: failed === 0 ? 'PASS' : 'FAIL' };
+
+  res.json({
+    success: true,
+    startedAt:  new Date().toISOString(),
+    durationMs: Date.now() - t0,
+    summary: { totalTests: passed + failed, passed, failed, allPassed: failed === 0 },
+    components: [comp],
+  });
+});
+
 // ── Main endpoint ────────────────────────────────────────────────────────────
 router.post('/smoke-test', protect, async (req, res) => {
   const startedAt = new Date().toISOString();
