@@ -39,8 +39,7 @@ const forensicBlockSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-forensicBlockSchema.index({ blockIndex: 1 });
-forensicBlockSchema.index({ currentHash: 1 });
+// blockIndex and currentHash are already indexed via unique:true on the field definitions
 forensicBlockSchema.index({ createdAt: -1 });
 
 module.exports = mongoose.model('ForensicBlock', forensicBlockSchema);

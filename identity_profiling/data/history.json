@@ -990,5 +990,44 @@
       "heuristic_fallback": 1
     },
     "timestamp": "2026-03-23T16:07:30.508044"
+  },
+  {
+    "user_id": "suspicious@test.com",
+    "is_anomaly": false,
+    "anomaly_score": 0.4,
+    "risk_level": "MEDIUM",
+    "contributing_factors": [
+      "Unusual access time (late night/early morning)",
+      "High file access ratio (potential data exfiltration)"
+    ],
+    "model_votes": {
+      "heuristic_fallback": 1
+    },
+    "timestamp": "2026-03-29T15:56:05.522281"
+  },
+  {
+    "user_id": "alice@company.com",
+    "is_anomaly": false,
+    "anomaly_score": 0.0,
+    "risk_level": "LOW",
+    "contributing_factors": [],
+    "model_votes": {
+      "heuristic_fallback": 1
+    },
+    "timestamp": "2026-03-29T15:56:05.547766"
+  },
+  {
+    "user_id": "suspicious@test.com",
+    "is_anomaly": false,
+    "anomaly_score": 0.4,
+    "risk_level": "MEDIUM",
+    "contributing_factors": [
+      "Unusual access time (late night/early morning)",
+      "High file access ratio (potential data exfiltration)"
+    ],
+    "model_votes": {
+      "heuristic_fallback": 1
+    },
+    "timestamp": "2026-03-29T15:59:39.409466"
   }
 ]
