@@ -11,9 +11,10 @@ from pydantic import BaseModel, Field
 from typing import List, Dict, Optional, Any
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import rsa, padding
-from cryptography.hazmat.backends import default_backend
-import hashlib, json, os
+import hashlib, json, os, logging
 from datetime import datetime
+
+logger = logging.getLogger("evidence_preservation")
 
 app = FastAPI(
     title="Evidence Preservation & Chain of Custody API",
@@ -75,16 +76,42 @@ PUBLIC_KEY = None
 # Key management
 def load_keys():
     global PRIVATE_KEY, PUBLIC_KEY
-    keys_dir = "../keys"
+    # Resolve keys/ folder relative to this file's location so the service
+    # works correctly regardless of which directory uvicorn is launched from.
+    base_dir  = os.path.dirname(os.path.abspath(__file__))
+    keys_dir  = os.path.join(base_dir, "..", "keys")
+    os.makedirs(keys_dir, exist_ok=True)
+    priv_path = os.path.join(keys_dir, "private_key.pem")
+    pub_path  = os.path.join(keys_dir, "public_key.pem")
+
     try:
-        if os.path.exists(f"{keys_dir}/private_key.pem"):
-            with open(f"{keys_dir}/private_key.pem", "rb") as f:
-                PRIVATE_KEY = serialization.load_pem_private_key(f.read(), password=None, backend=default_backend())
-        if os.path.exists(f"{keys_dir}/public_key.pem"):
-            with open(f"{keys_dir}/public_key.pem", "rb") as f:
-                PUBLIC_KEY = serialization.load_pem_public_key(f.read(), backend=default_backend())
+        if os.path.exists(priv_path) and os.path.exists(pub_path):
+            # Load existing keys — no backend= arg (removed in cryptography 42+)
+            with open(priv_path, "rb") as f:
+                PRIVATE_KEY = serialization.load_pem_private_key(f.read(), password=None)
+            with open(pub_path, "rb") as f:
+                PUBLIC_KEY = serialization.load_pem_public_key(f.read())
+            logger.info("[Evidence] RSA keys loaded from %s", os.path.abspath(keys_dir))
+        else:
+            # Auto-generate a fresh RSA-2048 key pair and persist it
+            logger.info("[Evidence] RSA keys not found — generating new RSA-2048 key pair ...")
+            PRIVATE_KEY = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+            PUBLIC_KEY = PRIVATE_KEY.public_key()
+
+            with open(priv_path, "wb") as f:
+                f.write(PRIVATE_KEY.private_bytes(
+                    serialization.Encoding.PEM,
+                    serialization.PrivateFormat.TraditionalOpenSSL,
+                    serialization.NoEncryption()
+                ))
+            with open(pub_path, "wb") as f:
+                f.write(PUBLIC_KEY.public_bytes(
+                    serialization.Encoding.PEM,
+                    serialization.PublicFormat.SubjectPublicKeyInfo
+                ))
+            logger.info("[Evidence] New key pair saved to %s", os.path.abspath(keys_dir))
     except Exception as e:
-        print(f"Warning: {e}")
+        logger.error("[Evidence] FAILED to load/generate keys: %s", e, exc_info=True)
 
 def canonicalize_data(data: dict) -> bytes:
     return json.dumps(data, sort_keys=True, separators=(',', ':')).encode('utf-8')
@@ -136,6 +163,17 @@ def verify_chain() -> VerificationResult:
     )
 
 load_keys()
+
+@app.on_event("startup")
+async def startup_event():
+    """Re-run key loading inside the uvicorn worker process.
+    With --reload, the module-level load_keys() may run in the reloader
+    parent and not carry over to the worker; this guarantees keys are set."""
+    if PRIVATE_KEY is None or PUBLIC_KEY is None:
+        logger.info("[Evidence] Startup event: keys not set, calling load_keys() ...")
+        load_keys()
+    logger.info("[Evidence] Startup complete — keys_loaded=%s  chain_blocks=%d",
+                PRIVATE_KEY is not None, len(EVIDENCE_CHAIN))
 
 # API endpoints
 @app.get("/", response_model=HealthResponse)
