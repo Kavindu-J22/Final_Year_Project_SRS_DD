@@ -3,7 +3,7 @@ Identity Profiling & Behavior Anomaly Detection API
 IT22920836 - Component 1
 
 Three-model ensemble: Isolation Forest + One-Class SVM + Autoencoder
-Run: uvicorn api:app --host 0.0.0.0 --port 8001 --reload
+Run: uvicorn api:app --host 0.0.0.0 --port 8001
 """
 
 import os
@@ -90,27 +90,49 @@ def _risk_level(score: float) -> str:
     return "LOW"
 
 # ── Synthetic training data ───────────────────────────────────────────────────
-def _make_training_data(n_normal: int = 2000, n_anomaly: int = 200) -> np.ndarray:
+def _make_training_data(n_normal: int = 3000) -> np.ndarray:
+    """
+    Generate realistic normal-session training data using right-skewed
+    (exponential / clipped-Gaussian) distributions so that low-activity
+    sessions – short duration, few events, single IP, low file-access – sit
+    at the CENTER of the training distribution, not at its fringe.
+
+    Feature vector (7 dims, must match _to_feature_vector):
+      0  hour_of_day          (raw, 0-23)
+      1  duration_sec / 3600  (hours)
+      2  event_count  / 100
+      3  distinct_ips         (float)
+      4  file_access_ratio    (0-1)
+      5  is_weekend           (0/1)
+      6  geo_score            (0-1)
+    """
     rng = np.random.RandomState(42)
-    normal = np.column_stack([
-        rng.randint(8, 18, n_normal).astype(float),     # business hours
-        rng.uniform(0.1, 2.0, n_normal),                # duration (hrs)
-        rng.uniform(0.1, 4.0, n_normal),                # event_count/100
-        rng.randint(1, 3, n_normal).astype(float),      # distinct_ips
-        rng.uniform(0.0, 0.3, n_normal),                # file_access_ratio
-        rng.randint(0, 2, n_normal).astype(float),      # is_weekend
-        rng.uniform(0.0, 0.2, n_normal),                # geo_score (safe)
-    ])
-    anomaly = np.column_stack([
-        rng.choice([0, 1, 2, 3, 22, 23], n_anomaly).astype(float),  # late night
-        rng.uniform(4.0, 12.0, n_anomaly),              # long sessions
-        rng.uniform(5.0, 20.0, n_anomaly),              # many events
-        rng.randint(4, 15, n_anomaly).astype(float),    # many IPs
-        rng.uniform(0.7, 1.0, n_anomaly),               # high file access
-        rng.randint(0, 2, n_anomaly).astype(float),
-        rng.uniform(0.7, 1.0, n_anomaly),               # risky geo
-    ])
-    return np.vstack([normal, anomaly])
+    n = n_normal
+
+    # hour: Gaussian centred on 10 am, clipped to [8, 17]
+    hours = np.clip(rng.normal(10.5, 2.0, n), 8, 17).astype(float)
+
+    # duration: exponential – most sessions 10-40 min (mean ≈ 0.35 h)
+    duration = np.clip(rng.exponential(0.35, n), 0.05, 3.0)
+
+    # event_count / 100: exponential – most sessions have ≤ 50 events (mean ≈ 0.25)
+    events = np.clip(rng.exponential(0.22, n), 0.01, 1.5)
+
+    # distinct_ips: 80 % single-IP, rest 2 or 3
+    ips = np.where(rng.random(n) < 0.80, 1.0,
+                   rng.choice([2.0, 3.0], n))
+
+    # file_access_ratio: exponential – most sessions access few files (mean ≈ 0.07)
+    file_ratio = np.clip(rng.exponential(0.07, n), 0.0, 0.40)
+
+    # is_weekend: ~20 % weekend sessions
+    weekend = (rng.random(n) < 0.20).astype(float)
+
+    # geo_score: 92 % safe (0.0), rest slightly elevated
+    geo = np.where(rng.random(n) < 0.92, 0.0,
+                   rng.uniform(0.1, 0.4, n))
+
+    return np.column_stack([hours, duration, events, ips, file_ratio, weekend, geo])
 
 # ── Model loading / training ──────────────────────────────────────────────────
 def _load_or_train():
