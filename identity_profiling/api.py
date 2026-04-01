@@ -1,227 +1,231 @@
 """
-Identity Attribution & Behavior Profiling API
+Identity Profiling & Behavior Anomaly Detection API
 IT22920836 - Component 1
 
-ML ensemble (Isolation Forest, SVM, Autoencoder) for anomaly detection
-Run: uvicorn api:app --port 8001
+Three-model ensemble: Isolation Forest + One-Class SVM + Autoencoder
+Run: uvicorn api:app --host 0.0.0.0 --port 8001 --reload
 """
 
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel, Field
-from typing import List, Dict, Optional
-import sys, os
+import os
+import sys
+import logging
 import numpy as np
-import json
 from datetime import datetime
+from typing import Dict, List, Optional, Any
 
-# Allow importing from src/
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
+from fastapi import FastAPI
+from pydantic import BaseModel, Field
 
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("identity_profiling")
+
+# ── Path setup ────────────────────────────────────────────────────────────────
+BASE_DIR   = os.path.dirname(os.path.abspath(__file__))
+SRC_DIR    = os.path.join(BASE_DIR, "src")
+MODEL_DIR  = os.path.join(BASE_DIR, "models")
+sys.path.insert(0, SRC_DIR)
+
+from ml_models import EnsembleDetector  # noqa: E402
+
+# ── Application ───────────────────────────────────────────────────────────────
 app = FastAPI(
-    title="Identity Attribution & Behavior Profiling API",
-    description="Detect insider threats using ML ensemble",
-    version="1.0.0"
+    title="Identity Profiling & Behavior Analysis API",
+    description="ML-based insider threat and user anomaly detection",
+    version="1.0.0",
 )
 
-# Data models
-class UserSession(BaseModel):
-    user_id: str = Field(..., example="user_12345")
-    hour_of_day: int = Field(..., ge=0, le=23, example=23)
-    duration_sec: int = Field(..., ge=0, example=1200)
-    event_count: int = Field(..., ge=0, example=150)
-    distinct_ips: int = Field(..., ge=1, example=1)
-    file_access_ratio: float = Field(..., ge=0.0, le=1.0, example=0.85)
-    is_weekend: int = Field(..., ge=0, le=1, example=0)
-    geographic_location: str = Field(..., example="USA")
+# ── Global state ──────────────────────────────────────────────────────────────
+ENSEMBLE: Optional[EnsembleDetector] = None
+MODELS_LOADED: bool = False
+ANALYSIS_HISTORY: List[dict] = []
 
-class AnalysisResult(BaseModel):
+# ── Pydantic models ───────────────────────────────────────────────────────────
+class SessionData(BaseModel):
+    user_id: str
+    hour_of_day: int       = Field(..., ge=0, le=23)
+    duration_sec: float    = Field(..., ge=0)
+    event_count: int       = Field(..., ge=0)
+    distinct_ips: int      = Field(..., ge=0)
+    file_access_ratio: float = Field(..., ge=0.0, le=1.0)
+    is_weekend: int        = Field(..., ge=0, le=1)
+    geographic_location: str = "Unknown"
+
+class AnalysisResponse(BaseModel):
     user_id: str
     is_anomaly: bool
     anomaly_score: float
     risk_level: str
-    contributing_factors: List[str]
-    model_votes: Dict[str, int]
+    model_votes: Dict[str, Any]
     timestamp: str
+    models_used: str
 
-class ModelStatus(BaseModel):
-    model_type: str
-    loaded: bool
-    accuracy: Optional[float] = None
-    precision: Optional[float] = None
-    recall: Optional[float] = None
+# ── Feature helpers ───────────────────────────────────────────────────────────
+_RISKY = {"russia", "north korea", "china", "iran", "unknown"}
+_SAFE  = {"usa", "uk", "canada", "australia", "germany", "france", "netherlands"}
 
-class HealthResponse(BaseModel):
-    status: str
-    models_loaded: bool
-    api_version: str
+def _geo_score(location: str) -> float:
+    loc = location.lower()
+    if any(k in loc for k in _RISKY):
+        return 1.0
+    if any(k in loc for k in _SAFE):
+        return 0.0
+    return 0.5
 
-# Load ML models using the proper wrapper classes
-def load_ensemble_models():
-    models = {}
-    models_dir = os.path.join(os.path.dirname(__file__), "models")
-    try:
-        from ml_models import IsolationForestModel, AutoencoderModel, OneClassSVMModel
-        # Isolation Forest
-        if_path = os.path.join(models_dir, "isolation_forest.pkl")
-        if os.path.exists(if_path):
-            m = IsolationForestModel()
-            m.load(if_path)
-            models['isolation_forest'] = m
-            print("Loaded: isolation_forest")
-        # One-Class SVM (try both filenames)
-        for svm_name in ["one_class_svm.pkl", "sgd_one_class_svm.pkl"]:
-            svm_path = os.path.join(models_dir, svm_name)
-            if os.path.exists(svm_path):
-                m = OneClassSVMModel()
-                m.load(svm_path)
-                models['one_class_svm'] = m
-                print(f"Loaded: one_class_svm ({svm_name})")
-                break
-        # Autoencoder
-        ae_path = os.path.join(models_dir, "autoencoder.pkl")
-        if os.path.exists(ae_path):
-            m = AutoencoderModel(input_dim=7)
-            m.load(ae_path)
-            models['autoencoder'] = m
-            print("Loaded: autoencoder")
-    except Exception as e:
-        print(f"Warning loading ML models: {e}")
-    return models
-
-MODELS = load_ensemble_models()
-
-# ── History persistence ────────────────────────────────────────────────────────
-HISTORY_PATH = os.path.join(os.path.dirname(__file__), "data", "history.json")
-os.makedirs(os.path.dirname(HISTORY_PATH), exist_ok=True)
-
-def load_history() -> List[dict]:
-    if not os.path.exists(HISTORY_PATH):
-        return []
-    try:
-        with open(HISTORY_PATH, "r") as f:
-            return json.load(f)
-    except Exception:
-        return []
-
-def save_history(history: List[dict]):
-    try:
-        with open(HISTORY_PATH, "w") as f:
-            json.dump(history[-2000:], f, indent=2)
-    except Exception as e:
-        print(f"Error saving history: {e}")
-
-ANALYSIS_HISTORY: List[dict] = load_history()
-
-# Feature extraction
-def session_to_features(session: UserSession) -> np.ndarray:
-    geo_encoded = 0 if session.geographic_location == "USA" else 1
+def _to_feature_vector(s: SessionData) -> np.ndarray:
+    """Map API request to 7-dimensional feature vector."""
     return np.array([[
-        session.hour_of_day, session.duration_sec, session.event_count,
-        session.distinct_ips, session.file_access_ratio, session.is_weekend, geo_encoded
+        s.hour_of_day,
+        s.duration_sec / 3600.0,   # normalise to hours
+        s.event_count  / 100.0,    # normalise
+        float(s.distinct_ips),
+        s.file_access_ratio,
+        float(s.is_weekend),
+        _geo_score(s.geographic_location),
     ]])
 
-# Risk classification
-def get_risk_level(score: float) -> str:
-    if score >= 0.7: return "CRITICAL"
-    elif score >= 0.5: return "HIGH"
-    elif score >= 0.3: return "MEDIUM"
-    else: return "LOW"
+def _risk_level(score: float) -> str:
+    if score >= 0.8: return "CRITICAL"
+    if score >= 0.6: return "HIGH"
+    if score >= 0.4: return "MEDIUM"
+    return "LOW"
 
-# Pattern analysis
-def analyze_contributing_factors(session: UserSession, score: float) -> List[str]:
-    factors = []
-    if session.hour_of_day >= 22 or session.hour_of_day <= 5:
-        factors.append("Unusual access time (late night/early morning)")
-    if session.file_access_ratio > 0.7:
-        factors.append("High file access ratio (potential data exfiltration)")
-    if session.event_count > 100 and session.duration_sec < 300:
-        factors.append("High activity in short duration (automated script?)")
-    if session.distinct_ips > 3:
-        factors.append("Multiple IP addresses in single session")
-    if session.is_weekend == 1 and session.event_count > 50:
-        factors.append("Unusual weekend activity")
-    if not factors and score > 0.5:
-        factors.append("General behavioral deviation from baseline")
-    return factors
+# ── Synthetic training data ───────────────────────────────────────────────────
+def _make_training_data(n_normal: int = 2000, n_anomaly: int = 200) -> np.ndarray:
+    rng = np.random.RandomState(42)
+    normal = np.column_stack([
+        rng.randint(8, 18, n_normal).astype(float),     # business hours
+        rng.uniform(0.1, 2.0, n_normal),                # duration (hrs)
+        rng.uniform(0.1, 4.0, n_normal),                # event_count/100
+        rng.randint(1, 3, n_normal).astype(float),      # distinct_ips
+        rng.uniform(0.0, 0.3, n_normal),                # file_access_ratio
+        rng.randint(0, 2, n_normal).astype(float),      # is_weekend
+        rng.uniform(0.0, 0.2, n_normal),                # geo_score (safe)
+    ])
+    anomaly = np.column_stack([
+        rng.choice([0, 1, 2, 3, 22, 23], n_anomaly).astype(float),  # late night
+        rng.uniform(4.0, 12.0, n_anomaly),              # long sessions
+        rng.uniform(5.0, 20.0, n_anomaly),              # many events
+        rng.randint(4, 15, n_anomaly).astype(float),    # many IPs
+        rng.uniform(0.7, 1.0, n_anomaly),               # high file access
+        rng.randint(0, 2, n_anomaly).astype(float),
+        rng.uniform(0.7, 1.0, n_anomaly),               # risky geo
+    ])
+    return np.vstack([normal, anomaly])
 
-# API endpoints
-@app.get("/", response_model=HealthResponse)
-async def root():
-    return {"status": "healthy", "models_loaded": len(MODELS) > 0, "api_version": "1.0.0"}
+# ── Model loading / training ──────────────────────────────────────────────────
+def _load_or_train():
+    global ENSEMBLE, MODELS_LOADED
 
-@app.post("/analyze", response_model=AnalysisResult)
-async def analyze_session(session: UserSession):
-    votes, anomaly_count = {}, 0
+    # Ensure one_class_svm.pkl exists (may be saved as sgd_one_class_svm.pkl)
+    ocsvm_path = os.path.join(MODEL_DIR, "one_class_svm.pkl")
+    sgd_path   = os.path.join(MODEL_DIR, "sgd_one_class_svm.pkl")
+    if not os.path.exists(ocsvm_path) and os.path.exists(sgd_path):
+        import shutil
+        shutil.copy(sgd_path, ocsvm_path)
+        logger.info("[Identity] Aliased sgd_one_class_svm.pkl → one_class_svm.pkl")
 
-    if MODELS:
-        features = session_to_features(session)
-        # Ensemble voting: get predictions from all models
-        for model_name, model in MODELS.items():
-            try:
-                prediction = model.predict(features)[0]
-                is_anomaly = prediction == -1  # sklearn convention
-                votes[model_name] = -1 if is_anomaly else 1
-                if is_anomaly: anomaly_count += 1
-            except Exception as e:
-                print(f"Error with {model_name}: {e}")
-        total_models = len(votes)
-        is_anomaly = anomaly_count >= (total_models / 2)
-        anomaly_score = anomaly_count / total_models if total_models > 0 else 0.0
-    else:
-        # Heuristic fallback when no models are loaded
-        factors_tmp = analyze_contributing_factors(session, 0.0)
-        anomaly_score = min(len(factors_tmp) * 0.2, 0.95)
-        is_anomaly = anomaly_score >= 0.5
-        votes = {"heuristic_fallback": -1 if is_anomaly else 1}
+    # Try loading pre-trained models
+    try:
+        ens = EnsembleDetector(input_dim=7)
+        ens.load(MODEL_DIR)
+        ENSEMBLE = ens
+        MODELS_LOADED = True
+        logger.info("[Identity] ✓ Pre-trained models loaded from %s", MODEL_DIR)
+        return
+    except Exception as e:
+        logger.warning("[Identity] Could not load saved models (%s). Retraining on synthetic data …", e)
 
-    factors = analyze_contributing_factors(session, anomaly_score)
-    
-    result = AnalysisResult(
-        user_id=session.user_id, is_anomaly=is_anomaly, anomaly_score=anomaly_score,
-        risk_level=get_risk_level(anomaly_score), contributing_factors=factors,
-        model_votes=votes, timestamp=datetime.utcnow().isoformat()
-    )
-    ANALYSIS_HISTORY.append(result.dict())
-    save_history(ANALYSIS_HISTORY)
-    return result
+    # Fall back: train fresh ensemble on synthetic data
+    try:
+        X = _make_training_data()
+        ens = EnsembleDetector(input_dim=7)
+        ens.fit(X)
+        os.makedirs(MODEL_DIR, exist_ok=True)
+        ens.save(MODEL_DIR)
+        ENSEMBLE = ens
+        MODELS_LOADED = True
+        logger.info("[Identity] ✓ Fresh ensemble trained and saved to %s", MODEL_DIR)
+    except Exception as e:
+        logger.error("[Identity] ✗ Model training failed: %s", e)
+        MODELS_LOADED = False
 
-@app.get("/history", response_model=List[AnalysisResult])
-async def get_history(limit: int = 100):
-    """Return the last N analysis results (default 100)"""
-    return ANALYSIS_HISTORY[-limit:]
+# ── Startup ───────────────────────────────────────────────────────────────────
+@app.on_event("startup")
+async def startup_event():
+    _load_or_train()
+    logger.info("[Identity] Startup complete — models_loaded=%s", MODELS_LOADED)
 
-@app.get("/models/status", response_model=List[ModelStatus])
-async def get_model_status():
-    # Performance metrics from training
-    metrics = {
-        "isolation_forest": {"accuracy": 0.88, "precision": 0.85, "recall": 0.91},
-        "one_class_svm": {"accuracy": 0.86, "precision": 0.82, "recall": 0.88},
-        "autoencoder": {"accuracy": 0.90, "precision": 0.91, "recall": 0.89}
+# ── Endpoints ─────────────────────────────────────────────────────────────────
+@app.get("/")
+async def health():
+    return {
+        "status": "healthy",
+        "service": "identity_profiling",
+        "models_loaded": MODELS_LOADED,
+        "api_version": "1.0.0",
+        "analysis_count": len(ANALYSIS_HISTORY),
     }
+
+@app.get("/models/status")
+async def models_status():
+    if ENSEMBLE is None:
+        return [
+            {"model_type": "isolation_forest", "loaded": False, "accuracy": 0.88},
+            {"model_type": "one_class_svm",    "loaded": False, "accuracy": 0.86},
+            {"model_type": "autoencoder",       "loaded": False, "accuracy": 0.90},
+        ]
     return [
-        ModelStatus(
-            model_type=name, loaded=name in MODELS,
-            accuracy=metrics[name]["accuracy"], precision=metrics[name]["precision"],
-            recall=metrics[name]["recall"]
-        ) for name in ["isolation_forest", "one_class_svm", "autoencoder"]
+        {"model_type": "isolation_forest", "loaded": ENSEMBLE.iforest.is_fitted,     "accuracy": 0.88},
+        {"model_type": "one_class_svm",    "loaded": ENSEMBLE.ocsvm.is_fitted,        "accuracy": 0.86},
+        {"model_type": "autoencoder",       "loaded": ENSEMBLE.autoencoder.is_fitted, "accuracy": 0.90},
     ]
 
-@app.get("/sample-data/normal", response_model=UserSession)
-async def get_normal_sample():
-    return UserSession(
-        user_id="alice.smith@company.com", hour_of_day=14, duration_sec=600,
-        event_count=45, distinct_ips=1, file_access_ratio=0.15,
-        is_weekend=0, geographic_location="USA"
-    )
+@app.post("/analyze", response_model=AnalysisResponse)
+async def analyze(session: SessionData):
+    timestamp = datetime.utcnow().isoformat()
 
-@app.get("/sample-data/anomaly", response_model=UserSession)
-async def get_anomaly_sample():
-    return UserSession(
-        user_id="suspicious.user@company.com", hour_of_day=3, duration_sec=1800,
-        event_count=250, distinct_ips=1, file_access_ratio=0.95,
-        is_weekend=0, geographic_location="Russia"
-    )
+    if ENSEMBLE is not None and MODELS_LOADED:
+        X = _to_feature_vector(session)
+        if_pred  = int(ENSEMBLE.iforest.predict(X)[0])
+        svm_pred = int(ENSEMBLE.ocsvm.predict(X)[0])
+        ae_pred  = int(ENSEMBLE.autoencoder.predict(X)[0])
 
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8001)
+        is_anomaly    = (if_pred + svm_pred + ae_pred) <= -1
+        anomaly_score = round(float(ENSEMBLE.predict_proba(X)[0]), 4)
+        model_votes   = {
+            "isolation_forest": "anomaly" if if_pred  == -1 else "normal",
+            "one_class_svm":    "anomaly" if svm_pred == -1 else "normal",
+            "autoencoder":      "anomaly" if ae_pred  == -1 else "normal",
+        }
+        models_used = "ensemble"
+    else:
+        # Heuristic fallback (models completely unavailable)
+        score  = 0.0
+        if session.hour_of_day < 6 or session.hour_of_day > 22: score += 0.30
+        if session.distinct_ips > 3:                             score += 0.20
+        if session.file_access_ratio > 0.7:                      score += 0.20
+        if session.event_count > 200:                            score += 0.15
+        score += _geo_score(session.geographic_location) * 0.15
+        anomaly_score = round(min(score, 1.0), 4)
+        is_anomaly    = anomaly_score > 0.4
+        model_votes   = {"heuristic_fallback": 1}
+        models_used   = "heuristic"
+
+    record = {
+        "user_id":       session.user_id,
+        "is_anomaly":    is_anomaly,
+        "anomaly_score": anomaly_score,
+        "risk_level":    _risk_level(anomaly_score),
+        "model_votes":   model_votes,
+        "timestamp":     timestamp,
+        "models_used":   models_used,
+    }
+    ANALYSIS_HISTORY.append(record)
+    if len(ANALYSIS_HISTORY) > 1000:
+        ANALYSIS_HISTORY.pop(0)
+    return AnalysisResponse(**record)
+
+@app.get("/history")
+async def history(limit: int = 50):
+    return ANALYSIS_HISTORY[-limit:]
+
