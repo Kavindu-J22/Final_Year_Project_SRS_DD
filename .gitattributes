@@ -1,0 +1,104 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# .gitattributes — Cloud Forensics Final Year Project
+#
+# Purpose: ensure every text file is stored with LF line endings in the git
+# object database, regardless of which OS a team member is on.
+# git then converts LF ↔ CRLF on checkout according to each person's OS.
+#
+# Without this file, Windows machines with core.autocrlf=true convert the LF
+# in text files to CRLF before committing, which corrupts binary-looking byte
+# sequences (e.g. UTF-16 characters that contain 0x0A bytes get their adjacent
+# 0x0D inserted, destroying the encoding).  With this file git handles the
+# conversion safely for all known text types, and never touches binary files.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Default: auto-detect text vs binary (safe fallback)
+*               text=auto
+
+# ── Python ──────────────────────────────────────────────────────────────────
+*.py            text eol=lf
+*.pyw           text eol=lf
+*.pyi           text eol=lf
+*.ipynb         text eol=lf
+
+# ── JavaScript / TypeScript ──────────────────────────────────────────────────
+*.js            text eol=lf
+*.jsx           text eol=lf
+*.ts            text eol=lf
+*.tsx           text eol=lf
+*.mjs           text eol=lf
+*.cjs           text eol=lf
+
+# ── Web ─────────────────────────────────────────────────────────────────────
+*.html          text eol=lf
+*.htm           text eol=lf
+*.css           text eol=lf
+*.scss          text eol=lf
+*.svg           text eol=lf
+
+# ── Data / Config ────────────────────────────────────────────────────────────
+*.json          text eol=lf
+*.yaml          text eol=lf
+*.yml           text eol=lf
+*.toml          text eol=lf
+*.ini           text eol=lf
+*.cfg           text eol=lf
+*.env           text eol=lf
+*.env.*         text eol=lf
+
+# ── Shell / Scripts ──────────────────────────────────────────────────────────
+*.sh            text eol=lf
+*.bash          text eol=lf
+Makefile        text eol=lf
+Dockerfile      text eol=lf
+*.dockerfile    text eol=lf
+docker-compose* text eol=lf
+
+# ── Documentation ────────────────────────────────────────────────────────────
+*.md            text eol=lf
+*.txt           text eol=lf
+*.rst           text eol=lf
+*.csv           text eol=lf
+
+# ── Node.js ──────────────────────────────────────────────────────────────────
+package.json    text eol=lf
+package-lock.json text eol=lf
+.eslintrc*      text eol=lf
+.prettierrc*    text eol=lf
+tsconfig*       text eol=lf
+next.config*    text eol=lf
+postcss*        text eol=lf
+tailwind*       text eol=lf
+
+# ── True binary files — git must NEVER apply line-ending conversion ──────────
+*.pkl           binary
+*.pyc           binary
+*.pyo           binary
+*.pem           binary
+*.key           binary
+*.p12           binary
+*.pfx           binary
+*.png           binary
+*.jpg           binary
+*.jpeg          binary
+*.gif           binary
+*.ico           binary
+*.webp          binary
+*.woff          binary
+*.woff2         binary
+*.ttf           binary
+*.eot           binary
+*.otf           binary
+*.zip           binary
+*.tar           binary
+*.gz            binary
+*.bz2           binary
+*.7z            binary
+*.rar           binary
+*.pdf           binary
+*.pptx          binary
+*.docx          binary
+*.xlsx          binary
+*.mp4           binary
+*.mp3           binary
+*.wav           binary
