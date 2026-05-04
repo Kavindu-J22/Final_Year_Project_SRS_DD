@@ -45,7 +45,7 @@ export default function ForensicsPage() {
 
   const integrityOk = stats?.integrity_status === 'VALID' || verify?.integrity_status === 'VALID';
 
-  const TABS = ['chain', 'anomalies', 'notary'];
+  const TABS = ['chain', 'anomalies', 'integrity'];
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -56,9 +56,9 @@ export default function ForensicsPage() {
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           {[
             { label: 'Evidence Blocks',  value: stats?.total_blocks      ?? chain.length, icon: Database,  color: 'text-purple-400' },
-            { label: 'Chain Integrity',  value: stats?.integrity_status  ?? '—',          icon: Lock,      color: integrityOk ? 'text-emerald-400' : 'text-red-400' },
+            { label: 'Sentinel Status',  value: stats?.integrity_status  ?? '—',          icon: Lock,      color: integrityOk ? 'text-emerald-400' : 'text-red-400' },
             { label: 'Timeline Anomalies',value: anomalies.length,                        icon: Activity,  color: 'text-amber-400' },
-            { label: 'Verify Status',    value: verify ? (verify.integrity_status ?? '—') : 'Not run', icon: Shield, color: integrityOk ? 'text-emerald-400' : 'text-slate-400' },
+            { label: 'Manual Verify',    value: verify ? (verify.integrity_status ?? '—') : 'Not run', icon: Shield, color: integrityOk ? 'text-emerald-400' : 'text-slate-400' },
           ].map(({ label, value, icon: Icon, color }) => (
             <div key={label} className="glass-card p-4 flex items-center gap-3">
               <Icon className={`w-5 h-5 ${color} flex-shrink-0`} />
@@ -114,7 +114,7 @@ export default function ForensicsPage() {
                   : 'border-transparent text-slate-500 hover:text-slate-300'
               }`}
             >
-              {tab === 'chain' ? 'Evidence Chain' : tab === 'anomalies' ? 'Timeline Anomalies' : 'Digital Notary'}
+              {tab === 'chain' ? 'Evidence Chain' : tab === 'anomalies' ? 'Timeline Anomalies' : 'Integrity Report'}
             </button>
           ))}
         </div>
@@ -168,11 +168,11 @@ export default function ForensicsPage() {
           </div>
         )}
 
-        {activeTab === 'notary' && (
+        {activeTab === 'integrity' && (
           <div className="glass-card p-6 space-y-5">
             <div className="flex items-center gap-2 mb-2">
               <Shield className="w-4 h-4 text-cyan-400" />
-              <h3 className="text-sm font-semibold text-slate-200">Digital Notary — Cryptographic Proof</h3>
+              <h3 className="text-sm font-semibold text-slate-200">Integrity Report & Sentinel Heartbeat</h3>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
               <div className="p-4 rounded-lg bg-slate-900/60 border border-slate-800">
@@ -182,6 +182,10 @@ export default function ForensicsPage() {
               <div className="p-4 rounded-lg bg-slate-900/60 border border-slate-800">
                 <p className="text-slate-500 uppercase tracking-wider text-[9px] mb-2">Signature Algorithm</p>
                 <p className="font-hash text-purple-400 text-sm">RSA-2048 · PKCS#1 v1.5</p>
+              </div>
+              <div className="p-4 rounded-lg bg-slate-900/60 border border-slate-800">
+                <p className="text-slate-500 uppercase tracking-wider text-[9px] mb-2">Batching Method</p>
+                <p className="font-hash text-amber-400 text-sm">Merkle Trees (SHA-256)</p>
               </div>
               <div className="p-4 rounded-lg bg-slate-900/60 border border-slate-800">
                 <p className="text-slate-500 uppercase tracking-wider text-[9px] mb-2">Total Blocks</p>
@@ -201,8 +205,8 @@ export default function ForensicsPage() {
               </div>
             )}
             <p className="text-[11px] text-slate-600 pt-2 border-t border-slate-800/60">
-              Each evidence block contains a SHA-256 hash of its contents plus the previous block's hash,
-              forming a tamper-evident chain. RSA-2048 signatures provide non-repudiation for forensic court admissibility.
+              Each evidence block batches logs into a Merkle Tree. The Merkle Root is hashed with the previous block's hash,
+              forming a tamper-evident chain. RSA-2048 signatures provide non-repudiation, and the Integrity Sentinel continually monitors the chain's health.
             </p>
           </div>
         )}

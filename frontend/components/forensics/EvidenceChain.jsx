@@ -62,6 +62,16 @@ function BlockRow({ block, isLast }) {
               {block.previousHash ?? block.previous_hash ?? '0'.repeat(64)}
             </p>
           </div>
+          <div>
+            <p className="text-slate-600 uppercase tracking-wider text-[9px] mb-0.5">Merkle Root</p>
+            <p className="font-hash text-amber-400 break-all">
+              {block.merkle_root ?? '—'}
+            </p>
+          </div>
+          <div>
+            <p className="text-slate-600 uppercase tracking-wider text-[9px] mb-0.5">Entries Batched</p>
+            <p className="font-hash text-slate-400">{block.entries?.length ?? 1}</p>
+          </div>
           {block.timestamp && (
             <div>
               <p className="text-slate-600 uppercase tracking-wider text-[9px] mb-0.5">Sealed At</p>

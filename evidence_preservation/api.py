@@ -11,8 +11,16 @@ from pydantic import BaseModel, Field
 from typing import List, Dict, Optional, Any
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import rsa, padding
-import hashlib, json, os, logging
+from cryptography.hazmat.primitives.asymmetric import rsa, padding
+import hashlib, json, os, logging, sys, asyncio
 from datetime import datetime
+
+# Import MerkleTree
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
+try:
+    from core.merkle import MerkleTree
+except ImportError:
+    MerkleTree = None
 
 logger = logging.getLogger("evidence_preservation")
 
@@ -34,7 +42,8 @@ class EvidenceEntry(BaseModel):
 class EvidenceBlock(BaseModel):
     block_index: int
     timestamp: str
-    data: Dict[str, Any]
+    entries: List[Dict[str, Any]]
+    merkle_root: str
     current_hash: str
     previous_hash: str
     signature: str
@@ -42,6 +51,7 @@ class EvidenceBlock(BaseModel):
 class PreservationResponse(BaseModel):
     status: str
     block_index: int
+    merkle_root: str
     hash: str
     signature: str
     message: str
@@ -72,6 +82,8 @@ class HealthResponse(BaseModel):
 EVIDENCE_CHAIN: List[EvidenceBlock] = []
 PRIVATE_KEY = None
 PUBLIC_KEY = None
+INTEGRITY_STATUS = "VALID"
+LAST_HEARTBEAT = "Never"
 
 # Key management
 def load_keys():
@@ -144,7 +156,15 @@ def verify_chain() -> VerificationResult:
     
     tampered, broken_links = [], []
     for i, block in enumerate(EVIDENCE_CHAIN):
-        canonical_data = canonicalize_data(block.data)
+        # We now verify the Merkle root instead of single data
+        canonical_data = canonicalize_data({"merkle_root": block.merkle_root, "timestamp": block.timestamp})
+        
+        # Optionally, verify the merkle tree itself if entries are present
+        if MerkleTree:
+            mt = MerkleTree(block.entries)
+            if mt.root != block.merkle_root:
+                tampered.append(i)
+                
         prev_hash = EVIDENCE_CHAIN[i-1].current_hash if i > 0 else "0" * 64
         expected_hash = calculate_hash(canonical_data, prev_hash)
         if expected_hash != block.current_hash or not verify_signature(block.current_hash, block.signature):
@@ -162,6 +182,20 @@ def verify_chain() -> VerificationResult:
         message="Chain is valid" if is_valid else "Chain integrity compromised"
     )
 
+async def integrity_sentinel():
+    """Background task to continuously verify chain integrity (Heartbeat)."""
+    global INTEGRITY_STATUS, LAST_HEARTBEAT
+    while True:
+        try:
+            if EVIDENCE_CHAIN:
+                result = verify_chain()
+                INTEGRITY_STATUS = "VALID" if result.is_valid else "COMPROMISED"
+            LAST_HEARTBEAT = datetime.utcnow().isoformat()
+        except Exception as e:
+            logger.error(f"[Sentinel] Error: {e}")
+            INTEGRITY_STATUS = "ERROR"
+        await asyncio.sleep(60) # Run every 60 seconds
+
 load_keys()
 
 @app.on_event("startup")
@@ -172,6 +206,10 @@ async def startup_event():
     if PRIVATE_KEY is None or PUBLIC_KEY is None:
         logger.info("[Evidence] Startup event: keys not set, calling load_keys() ...")
         load_keys()
+    
+    # Start the Integrity Sentinel background task
+    asyncio.create_task(integrity_sentinel())
+    
     logger.info("[Evidence] Startup complete — keys_loaded=%s  chain_blocks=%d",
                 PRIVATE_KEY is not None, len(EVIDENCE_CHAIN))
 
@@ -181,24 +219,42 @@ async def root():
     return {"status": "healthy", "keys_loaded": PRIVATE_KEY is not None and PUBLIC_KEY is not None,
             "chain_blocks": len(EVIDENCE_CHAIN), "api_version": "1.0.0"}
 
+class BatchPreserveRequest(BaseModel):
+    entries: List[EvidenceEntry]
+
 @app.post("/preserve", response_model=PreservationResponse)
 async def preserve_evidence(entry: EvidenceEntry):
+    return await preserve_batch(BatchPreserveRequest(entries=[entry]))
+
+@app.post("/preserve/batch", response_model=PreservationResponse)
+async def preserve_batch(request: BatchPreserveRequest):
     if not PRIVATE_KEY:
         raise HTTPException(status_code=503, detail="Signing key not available")
     
+    entries_dicts = [e.dict() for e in request.entries]
+    
+    if MerkleTree:
+        mt = MerkleTree(entries_dicts)
+        merkle_root = mt.root
+    else:
+        merkle_root = "0" * 64
+    
     previous_hash = EVIDENCE_CHAIN[-1].current_hash if EVIDENCE_CHAIN else "0" * 64
-    data_dict = entry.dict()
-    canonical_data = canonicalize_data(data_dict)
+    timestamp = datetime.utcnow().isoformat()
+    
+    # Hash the merkle root + timestamp as canonical data for the block hash
+    canonical_data = canonicalize_data({"merkle_root": merkle_root, "timestamp": timestamp})
     current_hash = calculate_hash(canonical_data, previous_hash)
     signature = sign_hash(current_hash)
     
     block = EvidenceBlock(
-        block_index=len(EVIDENCE_CHAIN), timestamp=datetime.utcnow().isoformat(),
-        data=data_dict, current_hash=current_hash, previous_hash=previous_hash, signature=signature
+        block_index=len(EVIDENCE_CHAIN), timestamp=timestamp,
+        entries=entries_dicts, merkle_root=merkle_root,
+        current_hash=current_hash, previous_hash=previous_hash, signature=signature
     )
     EVIDENCE_CHAIN.append(block)
     
-    return PreservationResponse(status="preserved", block_index=block.block_index, hash=current_hash,
+    return PreservationResponse(status="preserved", block_index=block.block_index, merkle_root=merkle_root, hash=current_hash,
                                 signature=signature, message=f"Evidence block {block.block_index} added to chain")
 
 @app.post("/verify", response_model=VerificationResult)
@@ -219,11 +275,10 @@ async def get_block(index: int):
 async def get_chain_stats():
     if not EVIDENCE_CHAIN:
         return ChainStats(total_blocks=0, chain_hash="N/A", integrity_status="EMPTY")
-    verification = verify_chain()
     return ChainStats(
         total_blocks=len(EVIDENCE_CHAIN), first_block_time=EVIDENCE_CHAIN[0].timestamp,
         last_block_time=EVIDENCE_CHAIN[-1].timestamp, chain_hash=EVIDENCE_CHAIN[-1].current_hash,
-        integrity_status="VALID" if verification.is_valid else "COMPROMISED"
+        integrity_status=INTEGRITY_STATUS
     )
 
 @app.get("/sample-data/log", response_model=EvidenceEntry)
