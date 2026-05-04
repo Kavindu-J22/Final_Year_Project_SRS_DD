@@ -277,13 +277,67 @@ class EnsembleDetector:
         self.autoencoder.load(os.path.join(model_dir, "autoencoder.pkl"))
         self.is_fitted = True
 
+class WeightedEnsembleDetector(EnsembleDetector):
+    """
+    Weighted Ensemble of all three models based on model confidence scores.
+    Replaces simple majority voting.
+    """
+    
+    def __init__(self, input_dim: int = 7):
+        super().__init__(input_dim)
+        # Weights can be adjusted based on validation performance
+        self.weights = {'iforest': 0.35, 'ocsvm': 0.30, 'autoencoder': 0.35}
+
+    def predict(self, X: np.ndarray) -> np.ndarray:
+        """Weighted ensemble voting. -1 if weighted votes indicate anomaly."""
+        pred_if = self.iforest.predict(X)
+        pred_svm = self.ocsvm.predict(X)
+        pred_ae = self.autoencoder.predict(X)
+        
+        vote_if = (pred_if == -1).astype(float) * self.weights['iforest']
+        vote_svm = (pred_svm == -1).astype(float) * self.weights['ocsvm']
+        vote_ae = (pred_ae == -1).astype(float) * self.weights['autoencoder']
+        
+        total_vote = vote_if + vote_svm + vote_ae
+        return np.where(total_vote >= 0.5, -1, 1)
+
+    def predict_proba(self, X: np.ndarray) -> np.ndarray:
+        """Get anomaly probability (0-1) using weighted votes."""
+        pred_if = (self.iforest.predict(X) == -1).astype(float) * self.weights['iforest']
+        pred_svm = (self.ocsvm.predict(X) == -1).astype(float) * self.weights['ocsvm']
+        pred_ae = (self.autoencoder.predict(X) == -1).astype(float) * self.weights['autoencoder']
+        
+        return pred_if + pred_svm + pred_ae
+
+    def get_feature_contributions(self, X: np.ndarray) -> np.ndarray:
+        """
+        Identify which of the features contributed most to the anomaly score.
+        SHAP-inspired custom contribution analysis using feature deviation from normal mean.
+        """
+        if not self.autoencoder.is_fitted:
+            return np.zeros_like(X)
+            
+        scaler = self.autoencoder.scaler
+        means = scaler.mean_
+        stds = scaler.scale_
+        
+        # Calculate z-scores (absolute deviation)
+        z_scores = np.abs((X - means) / stds)
+        
+        # Normalize to get relative contributions (0-1 percentages)
+        row_sums = z_scores.sum(axis=1, keepdims=True)
+        # Avoid division by zero
+        contributions = np.divide(z_scores, row_sums, out=np.zeros_like(z_scores), where=row_sums!=0)
+        
+        return contributions
+
 if __name__ == "__main__":
     np.random.seed(42)
     X_train = np.random.randn(1000, 7)
     X_test = np.random.randn(100, 7)
     X_test[0] = [10, 10, 10, 10, 10, 10, 10]
     
-    ensemble = EnsembleDetector(input_dim=7)
+    ensemble = WeightedEnsembleDetector(input_dim=7)
     ensemble.fit(X_train)
     
     preds = ensemble.predict(X_test)

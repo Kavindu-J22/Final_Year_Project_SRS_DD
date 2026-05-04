@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { History, RefreshCw, User, AlertTriangle, CheckCircle, Shield } from 'lucide-react';
 import Navbar from '@/components/layout/Navbar';
 import { forensicsAPI } from '@/lib/api';
@@ -16,6 +16,7 @@ export default function HistoryPage() {
   const [loading, setLoading] = useState(true);
   const [search,  setSearch]  = useState('');
   const [filter,  setFilter]  = useState('ALL');
+  const [selectedRow, setSelectedRow] = useState(null);
 
   const fetchHistory = useCallback(async () => {
     setLoading(true);
@@ -114,7 +115,8 @@ export default function HistoryPage() {
                     </td>
                   </tr>
                 ) : filtered.map((r, i) => (
-                  <tr key={i} className="hover:bg-slate-800/20 transition-colors">
+                  <React.Fragment key={i}>
+                  <tr onClick={() => setSelectedRow(r === selectedRow ? null : r)} className="hover:bg-slate-800/20 transition-colors cursor-pointer">
                     <td className="px-4 py-3 font-mono text-xs text-slate-300">{r.user_id}</td>
                     <td className="px-4 py-3">
                       <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${RISK_COLOR[r.risk_level] ?? 'text-slate-400'}`}>
@@ -130,12 +132,66 @@ export default function HistoryPage() {
                       {(r.anomaly_score * 100).toFixed(1)}%
                     </td>
                     <td className="px-4 py-3 text-xs text-slate-500 max-w-xs truncate">
-                      {(r.contributing_factors ?? []).join('; ') || '—'}
+                      {r.contribution_factors ? 'Click to view reasoning' : ((r.contributing_factors ?? []).join('; ') || '—')}
                     </td>
                     <td className="px-4 py-3 font-mono text-[10px] text-slate-600 whitespace-nowrap">
                       {r.timestamp ? new Date(r.timestamp).toLocaleString('en-GB') : '—'}
                     </td>
                   </tr>
+                  {selectedRow === r && (
+                    <tr className="bg-slate-800/40 border-b border-slate-700/50">
+                      <td colSpan={6} className="p-5">
+                        <div className="flex flex-col md:flex-row gap-6">
+                          <div className="flex-1 space-y-4">
+                            <div>
+                              <h4 className="text-sm font-semibold text-slate-200 flex items-center gap-2">
+                                <Shield className="w-4 h-4 text-cyan-400" /> 
+                                AI Reasoning & Contribution Factors
+                              </h4>
+                              <p className="text-[10px] text-slate-400 mt-1">Features most responsible for the anomaly score, identified via autoencoder distribution deviation.</p>
+                            </div>
+                            
+                            {r.contribution_factors ? (
+                               <div className="space-y-2.5">
+                                  {Object.entries(r.contribution_factors).sort((a,b) => b[1] - a[1]).map(([key, val]) => (
+                                    <div key={key} className="flex items-center gap-3 text-xs">
+                                       <span className="w-36 truncate text-slate-300 capitalize">{key.replace(/_/g, ' ')}</span>
+                                       <div className="flex-1 h-1.5 bg-slate-800/80 rounded-full overflow-hidden">
+                                         <div className={`h-full rounded-full ${val > 0.3 ? 'bg-red-400' : val > 0.15 ? 'bg-amber-400' : 'bg-cyan-500'}`} style={{ width: `${Math.min(100, val * 100)}%` }} />
+                                       </div>
+                                       <span className="w-10 text-right text-slate-400 font-mono">{(val * 100).toFixed(1)}%</span>
+                                    </div>
+                                  ))}
+                               </div>
+                            ) : (
+                              <p className="text-xs text-slate-500 italic p-3 bg-slate-900/30 rounded border border-slate-800/60">No detailed contribution factors available (Heuristic fallback used or old record).</p>
+                            )}
+                          </div>
+                          
+                          <div className="w-full md:w-64 glass-card p-4 border border-slate-700/40 bg-slate-900/30">
+                             <h4 className="text-[10px] font-bold text-slate-500 mb-3 uppercase tracking-wider">Weighted Model Votes</h4>
+                             <div className="space-y-2 text-xs">
+                               {Object.entries(r.model_votes || {}).map(([m, vote]) => (
+                                 <div key={m} className="flex items-center justify-between py-1 border-b border-slate-800/40 last:border-0">
+                                   <span className="text-slate-400 capitalize">{m.replace(/_/g, ' ')}</span>
+                                   <span className={`font-medium ${vote === 'anomaly' ? 'text-red-400' : 'text-emerald-400'}`}>
+                                      {vote.toString().toUpperCase()}
+                                   </span>
+                                 </div>
+                               ))}
+                             </div>
+                             <div className="mt-4 pt-3 border-t border-slate-700/50">
+                               <div className="flex justify-between items-center text-[10px]">
+                                 <span className="text-slate-500 uppercase">Detection Method</span>
+                                 <span className="text-cyan-400 font-mono">{r.models_used}</span>
+                               </div>
+                             </div>
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                  </React.Fragment>
                 ))}
               </tbody>
             </table>

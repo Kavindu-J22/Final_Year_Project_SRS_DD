@@ -25,7 +25,7 @@ SRC_DIR    = os.path.join(BASE_DIR, "src")
 MODEL_DIR  = os.path.join(BASE_DIR, "models")
 sys.path.insert(0, SRC_DIR)
 
-from ml_models import EnsembleDetector  # noqa: E402
+from ml_models import EnsembleDetector, WeightedEnsembleDetector  # noqa: E402
 
 # ── Application ───────────────────────────────────────────────────────────────
 app = FastAPI(
@@ -35,7 +35,7 @@ app = FastAPI(
 )
 
 # ── Global state ──────────────────────────────────────────────────────────────
-ENSEMBLE: Optional[EnsembleDetector] = None
+ENSEMBLE: Optional[WeightedEnsembleDetector] = None
 MODELS_LOADED: bool = False
 ANALYSIS_HISTORY: List[dict] = []
 
@@ -58,6 +58,7 @@ class AnalysisResponse(BaseModel):
     model_votes: Dict[str, Any]
     timestamp: str
     models_used: str
+    contribution_factors: Optional[Dict[str, float]] = None
 
 # ── Feature helpers ───────────────────────────────────────────────────────────
 _RISKY = {"russia", "north korea", "china", "iran", "unknown"}
@@ -148,7 +149,7 @@ def _load_or_train():
 
     # Try loading pre-trained models
     try:
-        ens = EnsembleDetector(input_dim=7)
+        ens = WeightedEnsembleDetector(input_dim=7)
         ens.load(MODEL_DIR)
         ENSEMBLE = ens
         MODELS_LOADED = True
@@ -160,7 +161,7 @@ def _load_or_train():
     # Fall back: train fresh ensemble on synthetic data
     try:
         X = _make_training_data()
-        ens = EnsembleDetector(input_dim=7)
+        ens = WeightedEnsembleDetector(input_dim=7)
         ens.fit(X)
         os.makedirs(MODEL_DIR, exist_ok=True)
         ens.save(MODEL_DIR)
@@ -212,14 +213,18 @@ async def analyze(session: SessionData):
         svm_pred = int(ENSEMBLE.ocsvm.predict(X)[0])
         ae_pred  = int(ENSEMBLE.autoencoder.predict(X)[0])
 
-        is_anomaly    = (if_pred + svm_pred + ae_pred) <= -1
+        is_anomaly    = bool(ENSEMBLE.predict(X)[0] == -1)
         anomaly_score = round(float(ENSEMBLE.predict_proba(X)[0]), 4)
         model_votes   = {
             "isolation_forest": "anomaly" if if_pred  == -1 else "normal",
             "one_class_svm":    "anomaly" if svm_pred == -1 else "normal",
             "autoencoder":      "anomaly" if ae_pred  == -1 else "normal",
         }
-        models_used = "ensemble"
+        models_used = "weighted_ensemble"
+        
+        contributions = ENSEMBLE.get_feature_contributions(X)[0]
+        feature_names = ["hour_of_day", "duration_sec", "event_count", "distinct_ips", "file_access_ratio", "is_weekend", "geographic_location"]
+        contribution_factors = {name: round(float(val), 4) for name, val in zip(feature_names, contributions)}
     else:
         # Heuristic fallback (models completely unavailable)
         score  = 0.0
@@ -229,9 +234,10 @@ async def analyze(session: SessionData):
         if session.event_count > 200:                            score += 0.15
         score += _geo_score(session.geographic_location) * 0.15
         anomaly_score = round(min(score, 1.0), 4)
-        is_anomaly    = anomaly_score > 0.4
+        is_anomaly    = bool(anomaly_score > 0.4)
         model_votes   = {"heuristic_fallback": 1}
         models_used   = "heuristic"
+        contribution_factors = None
 
     record = {
         "user_id":       session.user_id,
@@ -241,6 +247,7 @@ async def analyze(session: SessionData):
         "model_votes":   model_votes,
         "timestamp":     timestamp,
         "models_used":   models_used,
+        "contribution_factors": contribution_factors,
     }
     ANALYSIS_HISTORY.append(record)
     if len(ANALYSIS_HISTORY) > 1000:

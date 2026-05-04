@@ -11,7 +11,15 @@ from pydantic import BaseModel, Field
 from typing import List, Dict, Optional, Any
 from datetime import datetime
 from collections import deque
-import yaml, os, json
+import yaml, os, json, sys
+
+# Import KillChainCorrelator
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
+try:
+    from correlator import KillChainCorrelator, StateManager
+    correlator_engine = KillChainCorrelator(StateManager())
+except ImportError:
+    correlator_engine = None
 
 app = FastAPI(
     title="Incident Detection & Correlation API",
@@ -39,6 +47,8 @@ class IncidentAlert(BaseModel):
     source_events: List[str]
     timestamp: str
     recommendations: List[str]
+    kill_chain_stage: Optional[str] = None
+    kill_chain_progress: Optional[List[str]] = None
 
 class RuleInfo(BaseModel):
     rule_id: str
@@ -145,11 +155,49 @@ async def root():
     return {"status": "healthy", "rules_loaded": len(RULES_CACHE),
             "buffer_size": len(EVENT_BUFFER), "api_version": "1.0.0"}
 
+def to_normalized(event: LogEvent) -> dict:
+    status = "failure" if "Failed" in event.event_type or "Error" in event.event_type else "success"
+    # Ensure event_name is mapped properly for Correlator which expects terms like ConsoleLogin, etc.
+    event_name = event.event_type
+    if event.event_type == "FailedLogin": event_name = "ConsoleLogin"
+    if event.event_type == "FileAccess": event_name = "GetObject"
+    
+    return {
+        "event_name": event_name,
+        "status": status,
+        "source_ip": event.source_ip,
+        "actor_id": event.user_id,
+        "timestamp": event.timestamp,
+        "resource": event.resource
+    }
+
 @app.post("/ingest", response_model=Dict[str, Any])
 async def ingest_event(event: LogEvent):
     EVENT_BUFFER.append(event)
     alerts = []
-    if event.event_type == "FailedLogin":
+    global INCIDENT_COUNTER
+    
+    if correlator_engine:
+        corr_alerts = correlator_engine.process_event(to_normalized(event))
+        for ca in corr_alerts:
+            INCIDENT_COUNTER += 1
+            alert = IncidentAlert(
+                alert_id=f"INC-{INCIDENT_COUNTER:05d}",
+                severity=ca.severity,
+                title=ca.pattern_name,
+                description=ca.description,
+                mitre_technique=ca.pattern_id,
+                affected_user=ca.identifier,
+                source_events=[e.get("event_name", "Unknown") for e in ca.event_chain],
+                timestamp=ca.timestamp,
+                recommendations=["Investigate immediately", "Review related logs"],
+                kill_chain_stage=ca.kill_chain_stage,
+                kill_chain_progress=ca.kill_chain_progress
+            )
+            alerts.append(alert)
+            RECENT_INCIDENTS.append(alert)
+            
+    if event.event_type == "FailedLogin" and not alerts:
         recent_fails = [e for e in EVENT_BUFFER 
                        if e.user_id == event.user_id and e.event_type == "FailedLogin"]
         if len(recent_fails) >= 5:
@@ -157,6 +205,7 @@ async def ingest_event(event: LogEvent):
             if alert:
                 alerts.append(alert)
                 RECENT_INCIDENTS.append(alert)
+                
     return {"status": "ingested", "event_id": event.event_id,
             "buffer_size": len(EVENT_BUFFER), "alerts_triggered": len(alerts),
             "alerts": [alert.dict() for alert in alerts]}
@@ -164,14 +213,39 @@ async def ingest_event(event: LogEvent):
 @app.post("/correlate", response_model=List[IncidentAlert])
 async def correlate_events(request: CorrelationRequest):
     incidents = []
-    brute_force_alert = check_brute_force(request.events)
-    if brute_force_alert:
-        incidents.append(brute_force_alert)
-        RECENT_INCIDENTS.append(brute_force_alert)
-    insider_alert = check_insider_threat(request.events)
-    if insider_alert:
-        incidents.append(insider_alert)
-        RECENT_INCIDENTS.append(insider_alert)
+    global INCIDENT_COUNTER
+    
+    if correlator_engine:
+        for event in request.events:
+            corr_alerts = correlator_engine.process_event(to_normalized(event))
+            for ca in corr_alerts:
+                INCIDENT_COUNTER += 1
+                alert = IncidentAlert(
+                    alert_id=f"INC-{INCIDENT_COUNTER:05d}",
+                    severity=ca.severity,
+                    title=ca.pattern_name,
+                    description=ca.description,
+                    mitre_technique=ca.pattern_id,
+                    affected_user=ca.identifier,
+                    source_events=[e.get("event_name", "Unknown") for e in ca.event_chain],
+                    timestamp=ca.timestamp,
+                    recommendations=["Investigate immediately", "Review related logs"],
+                    kill_chain_stage=ca.kill_chain_stage,
+                    kill_chain_progress=ca.kill_chain_progress
+                )
+                incidents.append(alert)
+                RECENT_INCIDENTS.append(alert)
+                
+    if not incidents:
+        brute_force_alert = check_brute_force(request.events)
+        if brute_force_alert:
+            incidents.append(brute_force_alert)
+            RECENT_INCIDENTS.append(brute_force_alert)
+        insider_alert = check_insider_threat(request.events)
+        if insider_alert:
+            incidents.append(insider_alert)
+            RECENT_INCIDENTS.append(insider_alert)
+            
     return incidents
 
 @app.get("/incidents", response_model=List[IncidentAlert])

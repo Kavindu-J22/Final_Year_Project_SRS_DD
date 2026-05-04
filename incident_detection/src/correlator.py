@@ -74,6 +74,8 @@ class CorrelationAlert:
     identifier: str
     identifier_type: str
     event_chain: List[Dict]
+    kill_chain_stage: str = ""
+    kill_chain_progress: List[str] = field(default_factory=list)
     timestamp: str = field(default_factory=lambda: datetime.utcnow().isoformat())
     
     # to dict
@@ -86,6 +88,8 @@ class CorrelationAlert:
             "identifier": self.identifier,
             "identifier_type": self.identifier_type,
             "event_chain": self.event_chain,
+            "kill_chain_stage": self.kill_chain_stage,
+            "kill_chain_progress": self.kill_chain_progress,
             "timestamp": self.timestamp,
             "alert_type": "correlation"
         }
@@ -398,12 +402,63 @@ class Correlator:
         ]
         return any(kw in event_name for kw in delete_keywords)
 
+class KillChainCorrelator(Correlator):
+    """
+    Advanced correlator that tracks sequences across different MITRE categories
+    and increases severity contextually.
+    """
+    
+    KILL_CHAIN_STAGES = {
+        "Reconnaissance": ["AUTH_BRUTE_FORCE"],
+        "Initial Access": ["AUTH_SUCCESS_AFTER_FAILURES"],
+        "Execution & Persistence": ["PATTERN_BREACH_AND_PERSIST"],
+        "Exfiltration": ["PATTERN_DATA_EXFILTRATION"],
+        "Impact & Evasion": ["PATTERN_COVER_TRACKS", "RES_LOGGING_DISABLED"]
+    }
+    
+    def _map_rules_to_stages(self, triggered_rules: List[str]) -> List[str]:
+        stages_hit = []
+        for stage, rules in self.KILL_CHAIN_STAGES.items():
+            if any(r in triggered_rules for r in rules):
+                stages_hit.append(stage)
+        return stages_hit
+    
+    def _get_latest_stage(self, stages_hit: List[str]) -> str:
+        if not stages_hit: return "Unknown"
+        return stages_hit[-1]
+
+    def _process_for_identifier(
+        self, 
+        log: Dict, 
+        identifier: str, 
+        identifier_type: str
+    ) -> List[CorrelationAlert]:
+        alerts = super()._process_for_identifier(log, identifier, identifier_type)
+        
+        if alerts:
+            state = self.state_manager.get_state(identifier, identifier_type)
+            stages_hit = self._map_rules_to_stages(state.triggered_rules)
+            
+            for alert in alerts:
+                # Add Kill Chain Progress
+                alert.kill_chain_progress = stages_hit
+                alert.kill_chain_stage = self._get_latest_stage(stages_hit)
+                
+                # Contextual Severity: Escalate if multiple stages hit
+                if len(stages_hit) >= 3 and alert.severity in ["MEDIUM", "HIGH"]:
+                    alert.severity = "CRITICAL"
+                    alert.description = f"[ESCALATED] Multiple kill-chain stages ({len(stages_hit)}) detected. " + alert.description
+                elif len(stages_hit) == 2 and alert.severity == "MEDIUM":
+                    alert.severity = "HIGH"
+        
+        return alerts
+
 if __name__ == "__main__":
     import json
     
     print("Testing Correlation Engine...")
     
-    correlator = Correlator()
+    correlator = KillChainCorrelator()
     
     test_events = [
         {"event_name": "ConsoleLogin", "status": "failure", "source_ip": "192.168.1.100", "actor_id": "attacker", "timestamp": "2024-01-15T10:00:00Z"},

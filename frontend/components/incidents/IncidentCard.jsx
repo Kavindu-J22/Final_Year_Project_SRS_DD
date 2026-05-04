@@ -106,7 +106,32 @@ export default function IncidentCard({ incident, onStatusChange }) {
 
       {/* Expanded details */}
       {expanded && (
-        <div className="border-t border-slate-800/60 px-4 py-3 space-y-2 bg-slate-900/30">
+        <div className="border-t border-slate-800/60 px-4 py-3 space-y-4 bg-slate-900/30">
+          
+          {/* Kill Chain Visualization */}
+          {(incident.killChainProgress?.length > 0 || incident.kill_chain_progress?.length > 0) && (
+            <div>
+              <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-2">Kill Chain Progression</p>
+              <div className="flex flex-wrap items-center gap-2">
+                {['Reconnaissance', 'Initial Access', 'Execution & Persistence', 'Exfiltration', 'Impact & Evasion'].map((stage, i, arr) => {
+                  const progress = incident.killChainProgress || incident.kill_chain_progress || [];
+                  const isActive = progress.includes(stage);
+                  const isLast = i === arr.length - 1;
+                  return (
+                    <div key={stage} className="flex items-center gap-2">
+                      <div className={clsx('text-[10px] px-2 py-1 rounded border', 
+                        isActive ? 'bg-red-500/10 border-red-500/40 text-red-400 font-semibold' : 'bg-slate-800/40 border-slate-700/50 text-slate-500'
+                      )}>
+                        {stage}
+                      </div>
+                      {!isLast && <div className={clsx('w-3 h-px', isActive ? 'bg-red-500/50' : 'bg-slate-700')} />}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {incident.sourceEvents?.length > 0 && (
             <div>
               <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Source Events ({incident.sourceEvents.length})</p>
