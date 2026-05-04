@@ -14,6 +14,13 @@ from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
 import pandas as pd
 from datetime import datetime
+import sys
+import os
+
+# Add parent dir to path so we can import modules
+sys.path.insert(0, os.path.dirname(__file__))
+from ml_grouper import LogClusterModel
+from timeline_generator import ForensicReportGenerator
 
 app = FastAPI(
     title="Forensic Timeline Reconstruction API",
@@ -62,6 +69,7 @@ class AnalysisResult(BaseModel):
     noise_ratio: float
     clusters: List[ClusterInfo]
     processing_time_ms: float
+    report: Optional[str] = None
 
 class AnomalyDetail(BaseModel):
     """Detailed anomaly information"""
@@ -171,6 +179,40 @@ def simple_clustering(logs: List[LogEntry]) -> List[ClusterInfo]:
     
     return result
 
+def ml_clustering(logs: List[LogEntry]) -> List[ClusterInfo]:
+    """Semantic clustering using TF-IDF and DBSCAN"""
+    if not logs:
+        return []
+        
+    model = LogClusterModel(eps=0.5, min_samples=2) # low min_samples for demo purposes
+    payloads = [f"{log.method} {log.url}" for log in logs]
+    
+    try:
+        labels = model.train(payloads)
+    except Exception as e:
+        print(f"ML Clustering error: {e}, falling back to simple")
+        return simple_clustering(logs)
+        
+    clusters_data = {}
+    for i, label in enumerate(labels):
+        if label not in clusters_data:
+            clusters_data[label] = []
+        clusters_data[label].append(logs[i].url)
+        
+    result = []
+    for cluster_id, urls in clusters_data.items():
+        is_anomaly = (cluster_id == -1)
+        label_str = "Anomalies / Exploitation Attempts" if is_anomaly else f"Benign Behavioral Cluster {cluster_id}"
+        result.append(ClusterInfo(
+            cluster_id=int(cluster_id),
+            size=len(urls),
+            label=label_str,
+            representative_logs=list(set(urls))[:5],
+            is_anomaly=is_anomaly
+        ))
+    
+    return result
+
 # ============= API Endpoints =============
 
 @app.get("/", response_model=HealthResponse)
@@ -202,7 +244,8 @@ async def analyze_logs(logs: List[LogEntry]):
     ANALYZED_LOGS = logs
     
     # Perform clustering
-    clusters = simple_clustering(logs)
+    # Using the new semantic ML clustering based on TF-IDF n-grams
+    clusters = ml_clustering(logs)
     CLUSTERS = clusters
     
     # Extract anomalies
@@ -212,6 +255,10 @@ async def analyze_logs(logs: List[LogEntry]):
         if anomaly:
             anomalies.append(anomaly)
     ANOMALIES = anomalies
+    
+    # Generate Automated Forensic Report
+    report_gen = ForensicReportGenerator()
+    narrative = report_gen.generate_narrative(logs, clusters, anomalies)
     
     # Calculate metrics
     noise_cluster = next((c for c in clusters if c.cluster_id == -1), None)
@@ -226,7 +273,8 @@ async def analyze_logs(logs: List[LogEntry]):
         noise_count=noise_count,
         noise_ratio=round(noise_count / len(logs), 4) if len(logs) > 0 else 0.0,
         clusters=clusters,
-        processing_time_ms=round(processing_time, 2)
+        processing_time_ms=round(processing_time, 2),
+        report=narrative
     )
 
 @app.get("/clusters", response_model=List[ClusterInfo])

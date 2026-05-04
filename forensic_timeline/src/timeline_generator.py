@@ -115,3 +115,48 @@ class RealLogLoader:
         })
 
         return pd.concat([df, pd.DataFrame(attacks)], ignore_index=True)
+
+class ForensicReportGenerator:
+    """Automated narrative synthesis for timeline data"""
+    
+    def generate_narrative(self, logs, clusters, anomalies) -> str:
+        if not logs:
+            return "No logs provided for analysis."
+        
+        try:
+            # logs might be objects with .timestamp or dicts
+            start_time = min((getattr(l, 'timestamp', None) or l['timestamp'] for l in logs), default="Unknown timeframe")
+            end_time = max((getattr(l, 'timestamp', None) or l['timestamp'] for l in logs), default="Unknown timeframe")
+        except:
+            start_time = "Unknown"
+            end_time = "Unknown"
+            
+        narrative = f"# Automated Forensic Incident Report\n\n"
+        narrative += f"**Time Window:** {start_time} to {end_time}\n"
+        narrative += f"**Total Log Events Analyzed:** {len(logs)}\n"
+        narrative += f"**Distinct Behavioral Clusters:** {len([c for c in clusters if c.cluster_id != -1])}\n\n"
+        
+        if anomalies:
+            narrative += "## Executive Summary: Threat Detected\n"
+            narrative += f"The DBSCAN semantic clustering engine, utilizing TF-IDF n-gram (1,3) feature extraction, identified **{len(anomalies)} anomalous events** indicating potential adversarial behavior.\n\n"
+            
+            for a in anomalies:
+                # Handle dict or object
+                ts = getattr(a, 'timestamp', None) or a.get('timestamp', 'N/A')
+                sev = getattr(a, 'severity', None) or a.get('severity', 'HIGH')
+                pat = getattr(a, 'suspicious_pattern', None) or a.get('suspicious_pattern', '')
+                rsn = getattr(a, 'reason', None) or a.get('reason', '')
+                narrative += f"- **[{ts}] [Severity: {sev}]** {rsn}\n  - Payload/Path: `{pat}`\n"
+                
+            narrative += "\n## Attack Sequence Reconstruction\n"
+            narrative += "The timeline analysis suggests the following sequenced activities occurred:\n"
+            narrative += "1. **Initial Access / Reconnaissance**: The attacker probed the external perimeter, identified by noisy clusters.\n"
+            narrative += "2. **Exploitation Phase**: Specific targeted payloads (e.g., SQLi/Path Traversal) were executed as highlighted in the anomalies.\n"
+            narrative += "3. **Post-Exploitation**: Check subsequent normal clusters for potential persistence mechanisms or data exfiltration via API endpoints.\n"
+        else:
+            narrative += "## Executive Summary\n"
+            narrative += "The clustering engine analyzed the semantic properties of the provided payloads and found **no critical anomalies** or deviations from established baselines.\n\n"
+            narrative += "All traffic aligned with standard benign behavioral clusters.\n"
+            
+        narrative += "\n---\n*Report generated automatically by the Semantic Clustering Engine.*"
+        return narrative

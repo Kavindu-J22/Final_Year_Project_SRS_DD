@@ -1,6 +1,6 @@
 'use client';
 import { useState, useCallback, useEffect } from 'react';
-import { Clock, Search, RefreshCw, AlertCircle, BarChart2, Activity } from 'lucide-react';
+import { Clock, Search, RefreshCw, AlertCircle, BarChart2, Activity, Download } from 'lucide-react';
 import Navbar from '@/components/layout/Navbar';
 import { forensicsAPI } from '@/lib/api';
 
@@ -22,6 +22,7 @@ export default function TimelinePage() {
   const [running,   setRunning]   = useState(false);
   const [searching, setSearching] = useState(false);
   const [error,     setError]     = useState('');
+  const [report,    setReport]    = useState(null);
 
   const runAnalysis = useCallback(async () => {
     setRunning(true); setError('');
@@ -37,6 +38,7 @@ export default function TimelinePage() {
       if (analyzeRes.status === 'fulfilled') {
         const d = analyzeRes.value.data?.data ?? analyzeRes.value.data;
         setClusters(d?.clusters ?? []);
+        setReport(d?.report ?? null);
       }
       if (metricsRes.status === 'fulfilled') {
         setMetrics(metricsRes.value.data?.data ?? metricsRes.value.data);
@@ -57,6 +59,17 @@ export default function TimelinePage() {
 
   const loadSample = () => setLogs(JSON.stringify(SAMPLE_LOGS, null, 2));
 
+  const downloadReport = () => {
+    if (!report) return;
+    const blob = new Blob([report], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Forensic_Report_${new Date().toISOString().replace(/[:.]/g, '-')}.md`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   // Auto-load + analyze on first mount so the page isn't blank
   useEffect(() => {
     const autoRun = async () => {
@@ -69,6 +82,7 @@ export default function TimelinePage() {
         if (analyzeRes.status === 'fulfilled') {
           const d = analyzeRes.value.data?.data ?? analyzeRes.value.data;
           setClusters(d?.clusters ?? []);
+          setReport(d?.report ?? null);
         }
         if (metricsRes.status === 'fulfilled') {
           setMetrics(metricsRes.value.data?.data ?? metricsRes.value.data);
@@ -109,10 +123,18 @@ export default function TimelinePage() {
             rows={7}
             className="w-full bg-slate-900/60 border border-slate-700/60 rounded-lg px-3 py-2 text-xs font-mono text-slate-300 placeholder-slate-600 focus:outline-none focus:border-cyan-500/50 resize-y"
           />
-          <button onClick={runAnalysis} disabled={running} className="btn-primary flex items-center gap-2">
-            {running ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Activity className="w-4 h-4" />}
-            {running ? 'Analysing…' : 'Run Timeline Analysis'}
-          </button>
+          <div className="flex items-center gap-3">
+            <button onClick={runAnalysis} disabled={running} className="btn-primary flex items-center gap-2">
+              {running ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Activity className="w-4 h-4" />}
+              {running ? 'Analysing…' : 'Run Timeline Analysis'}
+            </button>
+            {report && (
+              <button onClick={downloadReport} className="flex items-center gap-2 border border-slate-700 bg-slate-900/60 hover:bg-slate-800 px-3 py-2 rounded-lg text-sm transition-colors text-slate-300">
+                <Download className="w-4 h-4 text-emerald-400" />
+                Download Forensic Report (Markdown)
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Entity Search */}

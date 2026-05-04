@@ -12,7 +12,8 @@ class LogClusterModel:
     def __init__(self, eps=0.5, min_samples=5):
         self.eps = eps
         self.min_samples = min_samples
-        self.vectorizer = TfidfVectorizer(max_features=100, stop_words='english')
+        # Advanced Semantic Weighting: Added n-gram analysis (1,3) for payloads
+        self.vectorizer = TfidfVectorizer(max_features=500, stop_words='english', ngram_range=(1, 3))
         self.model = DBSCAN(eps=self.eps, min_samples=self.min_samples, metric='cosine')
         
     # Method to train model
