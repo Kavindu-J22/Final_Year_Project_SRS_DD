@@ -6,6 +6,7 @@ import Navbar from '@/components/layout/Navbar';
 import MetricsGrid from '@/components/dashboard/MetricsGrid';
 import ForensicTimeline from '@/components/dashboard/ForensicTimeline';
 import ThreatActivityChart from '@/components/dashboard/ThreatActivityChart';
+import AttackSimulator from '@/components/dashboard/AttackSimulator';
 import { dashboardAPI } from '@/lib/api';
 
 const ML_SERVICES = [
@@ -146,6 +147,9 @@ export default function DashboardPage() {
             })}
           </div>
         </div>
+
+        {/* Vulnerable Cloud Simulator Panel */}
+        <AttackSimulator onAttackComplete={fetchAll} />
 
         {/* Recent Activity */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

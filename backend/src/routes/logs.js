@@ -2,7 +2,7 @@ const express      = require('express');
 const LogEntry     = require('../models/LogEntry');
 const ClusterResult= require('../models/ClusterResult');
 const { protect }  = require('../middleware/authMiddleware');
-const { timelineService, incidentService } = require('../services/mlService');
+const { timelineService, incidentService, identityService, evidenceService } = require('../services/mlService');
 const { computeSHA256, generateAnalysisId, generateLogId } = require('../utils/hashUtils');
 
 const router = express.Router();
@@ -51,6 +51,22 @@ router.post('/ingest', protect, async (req, res) => {
     alerts = result.alerts || [];
   } catch { /* service offline – continue without alerts */ }
 
+  // Component 1: Identity Profiling (Simulated Session)
+  let identityAlerts = null;
+  try {
+    const session = {
+        user_id: body.userId || body.ipAddress || 'unknown',
+        hour_of_day: new Date().getHours(),
+        duration_sec: 120, 
+        event_count: 50,
+        distinct_ips: 1,
+        file_access_ratio: body.url?.includes('/files') ? 1.0 : 0.0,
+        is_weekend: [0, 6].includes(new Date().getDay()) ? 1 : 0,
+        geographic_location: "Unknown"
+    };
+    identityAlerts = await identityService.analyzeSession(session);
+  } catch (err) { /* service offline */ }
+
   const sha256Hash = computeSHA256(body);
 
   const log = await LogEntry.create({
@@ -64,9 +80,25 @@ router.post('/ingest', protect, async (req, res) => {
     userId:     body.userId,
     eventType:  body.eventType,
     metadata:   body.metadata || {},
+    // Store identity result if applicable
+    isAnomaly:  identityAlerts?.is_anomaly || false,
+    riskLevel:  identityAlerts?.risk_level || 'LOW'
   });
 
-  res.status(201).json({ success: true, data: log, alerts });
+  // Component 3: Evidence Preservation
+  try {
+    await evidenceService.preserveEvidence({
+       log_id: log.logId,
+       timestamp: log.timestamp.toISOString(),
+       ip_address: log.ipAddress,
+       method: log.method,
+       url: log.url,
+       status_code: log.statusCode,
+       hash: sha256Hash
+    });
+  } catch (err) { /* service offline */ }
+
+  res.status(201).json({ success: true, data: log, alerts, identity: identityAlerts });
 });
 
 // ── POST /api/logs/analyze – batch DBSCAN / TF-IDF analysis ──────────────────
