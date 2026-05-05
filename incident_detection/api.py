@@ -18,8 +18,10 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
 try:
     from correlator import KillChainCorrelator, StateManager
     correlator_engine = KillChainCorrelator(StateManager())
+    from ml_predictor import predictor
 except ImportError:
     correlator_engine = None
+    predictor = None
 
 app = FastAPI(
     title="Incident Detection & Correlation API",
@@ -146,9 +148,25 @@ def check_insider_threat(events: List[LogEvent]) -> Optional[IncidentAlert]:
             mitre_technique="T1078 - Valid Accounts", affected_user=suspicious[0].user_id,
             source_events=[e.event_id for e in suspicious],
             timestamp=datetime.utcnow().isoformat(),
-            recommendations=["Review user activity", "Check data exfiltration", "Contact user"]
+            recommendations=["Review user activity", "Check data exfiltration", "Contact user"],
+            kill_chain_stage="Exfiltration",
+            kill_chain_progress=["Exfiltration"]
         )
     return None
+
+def create_alert(event: LogEvent, severity: str, title: str, mitre: str, desc: str, stage: str) -> IncidentAlert:
+    forecast = predictor.predict_next_stages([stage]) if predictor else []
+    return IncidentAlert(
+        alert_id=f"INC-{uuid.uuid4().hex[:8]}", severity=severity,
+        title=title, description=desc,
+        mitre_technique=mitre, affected_user=event.user_id,
+        source_events=[event.event_id],
+        timestamp=datetime.utcnow().isoformat(),
+        recommendations=["Investigate immediately", "Review source IP"],
+        kill_chain_stage=stage,
+        kill_chain_progress=[stage],
+        threat_forecast=forecast
+    )
 
 load_rules()
 
@@ -200,14 +218,55 @@ async def ingest_event(event: LogEvent):
             alerts.append(alert)
             RECENT_INCIDENTS.append(alert)
             
-    if event.event_type == "FailedLogin" and not alerts:
-        recent_fails = [e for e in EVENT_BUFFER 
-                       if e.user_id == event.user_id and e.event_type == "FailedLogin"]
-        if len(recent_fails) >= 5:
-            alert = check_brute_force(recent_fails)
-            if alert:
-                alerts.append(alert)
-                RECENT_INCIDENTS.append(alert)
+    if not alerts:
+        if event.event_type == "FailedLogin":
+            recent_fails = [e for e in EVENT_BUFFER 
+                           if e.user_id == event.user_id and e.event_type == "FailedLogin"]
+            if len(recent_fails) >= 5:
+                alert = check_brute_force(recent_fails)
+                if alert:
+                    alerts.append(alert)
+                    RECENT_INCIDENTS.append(alert)
+        elif event.event_type == "SQLInjectionAttempt":
+            alert = create_alert(event, "CRITICAL", "SQL Injection Detected", "T1190", "Detected malicious SQL payload", "Initial Access")
+            alerts.append(alert)
+            RECENT_INCIDENTS.append(alert)
+        elif event.event_type == "PathTraversalAttempt":
+            alert = create_alert(event, "HIGH", "Path Traversal (LFI) Detected", "T1083", "Attempt to read unauthorized local files", "Reconnaissance")
+            alerts.append(alert)
+            RECENT_INCIDENTS.append(alert)
+        elif event.event_type == "PrivilegeEscalation":
+            alert = create_alert(event, "CRITICAL", "Privilege Escalation Detected", "T1078", "Unauthorized admin privilege request", "Execution & Persistence")
+            alerts.append(alert)
+            RECENT_INCIDENTS.append(alert)
+        elif event.event_type == "MassFileModification":
+            alert = create_alert(event, "CRITICAL", "Ransomware Activity Detected", "T1486", "Mass file encryption/modification", "Impact & Evasion")
+            alerts.append(alert)
+            RECENT_INCIDENTS.append(alert)
+        elif event.event_type == "DefenseEvasion":
+            alert = create_alert(event, "HIGH", "Defense Evasion (Audit Cleared)", "T1070", "Audit trail deletion detected", "Impact & Evasion")
+            alerts.append(alert)
+            RECENT_INCIDENTS.append(alert)
+        elif event.event_type == "MaliciousFileUpload":
+            alert = create_alert(event, "CRITICAL", "Web Shell Upload Detected", "T1505.003", "Suspicious PHP/Shell file upload", "Execution & Persistence")
+            alerts.append(alert)
+            RECENT_INCIDENTS.append(alert)
+        elif event.event_type == "CredentialStuffing":
+            alert = create_alert(event, "HIGH", "Credential Stuffing Detected", "T1110.004", "Distributed login attempts using compromised credentials", "Initial Access")
+            alerts.append(alert)
+            RECENT_INCIDENTS.append(alert)
+        elif event.event_type == "LowAndSlow":
+            alert = create_alert(event, "MEDIUM", "Low & Slow AI Evasion", "T1059", "Stealthy, time-delayed requests evading standard thresholds", "Impact & Evasion")
+            alerts.append(alert)
+            RECENT_INCIDENTS.append(alert)
+        elif event.event_type == "ImpossibleTravel":
+            alert = create_alert(event, "CRITICAL", "Impossible Travel Detected", "T1078", "Login from two geographically distant locations simultaneously", "Initial Access")
+            alerts.append(alert)
+            RECENT_INCIDENTS.append(alert)
+        elif event.event_type == "InsiderThreatEvent":
+            alert = create_alert(event, "HIGH", "Potential Insider Threat", "T1078", "Anomalous off-hours mass file access", "Exfiltration")
+            alerts.append(alert)
+            RECENT_INCIDENTS.append(alert)
                 
     return {"status": "ingested", "event_id": event.event_id,
             "buffer_size": len(EVENT_BUFFER), "alerts_triggered": len(alerts),

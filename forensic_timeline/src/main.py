@@ -99,23 +99,51 @@ def detect_sql_injection(url: str) -> bool:
 
 def detect_path_traversal(url: str) -> bool:
     """Detect path traversal patterns"""
-    return "../" in url or "..%2F" in url
+    return "../" in url or "..%2F" in url or "etc/passwd" in url.lower()
 
 def detect_command_injection(url: str) -> bool:
     """Detect command injection patterns"""
-    cmd_patterns = ["cmd=", "exec=", "whoami", "cat%20", ";ls"]
+    cmd_patterns = ["cmd=", "exec=", "whoami", "cat%20", ";ls", ".sh"]
     return any(pattern in url.lower() for pattern in cmd_patterns)
+
+def detect_malicious_upload(url: str) -> bool:
+    return "/upload" in url.lower() and (".php" in url.lower() or "shell" in url.lower())
+
+def detect_privilege_escalation(url: str) -> bool:
+    return "/privilege" in url.lower() and "admin" in url.lower()
+
+def detect_ransomware(url: str) -> bool:
+    return "/ransomware" in url.lower()
+
+def detect_defense_evasion(method: str, url: str) -> bool:
+    return method == "DELETE" and "/logs" in url.lower()
+
+def detect_simulated_event(url: str) -> bool:
+    return "/simulate_event" in url.lower() or "/simulate/" in url.lower()
 
 def analyze_log(log: LogEntry) -> Optional[AnomalyDetail]:
     """Analyze single log for anomalies"""
     anomalies = []
     
     if detect_sql_injection(log.url):
-        anomalies.append("SQL Injection attempt detected")
+        anomalies.append("SQL Injection Attempt")
     if detect_path_traversal(log.url):
-        anomalies.append("Path traversal attempt detected")
+        anomalies.append("Path Traversal (LFI)")
     if detect_command_injection(log.url):
-        anomalies.append("Command injection attempt detected")
+        anomalies.append("Command Injection")
+    if detect_malicious_upload(log.url):
+        anomalies.append("Web Shell Upload")
+    if detect_privilege_escalation(log.url):
+        anomalies.append("Privilege Escalation")
+    if detect_ransomware(log.url):
+        anomalies.append("Ransomware Mass Encryption")
+    if detect_defense_evasion(log.method, log.url):
+        anomalies.append("Defense Evasion (Audit Cleared)")
+    if detect_simulated_event(log.url):
+        if "CredentialStuffing" in log.url: anomalies.append("Distributed Credential Stuffing")
+        elif "ImpossibleTravel" in log.url: anomalies.append("Impossible Travel")
+        elif "LowAndSlow" in log.url: anomalies.append("Low & Slow AI Evasion")
+        else: anomalies.append("Simulated AI Anomaly")
     
     if anomalies:
         return AnomalyDetail(

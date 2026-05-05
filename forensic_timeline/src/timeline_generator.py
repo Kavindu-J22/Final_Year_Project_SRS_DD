@@ -148,11 +148,47 @@ class ForensicReportGenerator:
                 rsn = getattr(a, 'reason', None) or a.get('reason', '')
                 narrative += f"- **[{ts}] [Severity: {sev}]** {rsn}\n  - Payload/Path: `{pat}`\n"
                 
-            narrative += "\n## Attack Sequence Reconstruction\n"
-            narrative += "The timeline analysis suggests the following sequenced activities occurred:\n"
-            narrative += "1. **Initial Access / Reconnaissance**: The attacker probed the external perimeter, identified by noisy clusters.\n"
-            narrative += "2. **Exploitation Phase**: Specific targeted payloads (e.g., SQLi/Path Traversal) were executed as highlighted in the anomalies.\n"
-            narrative += "3. **Post-Exploitation**: Check subsequent normal clusters for potential persistence mechanisms or data exfiltration via API endpoints.\n"
+            narrative += "\n## AI Predicted Sequence & Suggestions\n"
+            narrative += "Based on the ML cluster analysis, the following adversarial behavioral chain is predicted:\n"
+            
+            # Dynamic sequencing based on actual anomalies
+            anomaly_types = set()
+            for a in anomalies:
+                rsn = getattr(a, 'reason', None) or a.get('reason', '')
+                for r in rsn.split('; '):
+                    anomaly_types.add(r)
+                    
+            if "SQL Injection Attempt" in anomaly_types or "Path Traversal (LFI)" in anomaly_types:
+                narrative += "1. **Initial Access / Reconnaissance**: Targeted probing of the application perimeter.\n"
+                narrative += "2. **Exploitation Phase**: Payload execution to bypass authentication or read local files.\n"
+                narrative += "   - *Suggestion*: Audit input sanitization and implement strict WAF filtering.\n"
+            
+            if "Web Shell Upload" in anomaly_types:
+                narrative += "1. **Persistence & RCE**: A malicious web shell was likely uploaded successfully.\n"
+                narrative += "2. **Command Execution**: Attacker is establishing a foothold to execute arbitrary system commands.\n"
+                narrative += "   - *Suggestion*: Quarantine the `/uploads` directory immediately and inspect file integrity monitoring alerts.\n"
+                
+            if "Privilege Escalation" in anomaly_types:
+                narrative += "1. **Lateral Movement / Escalation**: An identity attempting to attach unauthorized admin privileges.\n"
+                narrative += "   - *Suggestion*: Revoke compromised tokens and enforce Principle of Least Privilege (PoLP) on IAM roles.\n"
+                
+            if "Ransomware Mass Encryption" in anomaly_types:
+                narrative += "1. **Impact**: Massive file modification consistent with ransomware encryption algorithms.\n"
+                narrative += "2. **Extortion**: Attacker will likely drop a ransom note and demand payment.\n"
+                narrative += "   - *Suggestion*: Immediately isolate the affected cloud bucket and initiate emergency data backups.\n"
+                
+            if "Defense Evasion (Audit Cleared)" in anomaly_types:
+                narrative += "1. **Defense Evasion**: The attacker explicitly targeted CloudTrail/Audit logs for deletion to cover their tracks.\n"
+                narrative += "   - *Suggestion*: Lock down IAM permissions regarding log deletion and review offline syslog backups.\n"
+                
+            if "Distributed Credential Stuffing" in anomaly_types or "Impossible Travel" in anomaly_types or "Low & Slow AI Evasion" in anomaly_types:
+                narrative += "1. **Advanced Evasion**: The attacker is utilizing advanced ML-evasion techniques (distributed IPs or time-delays).\n"
+                narrative += "   - *Suggestion*: Enforce mandatory MFA immediately and lower the rate-limiting threshold for anomalous IP subsets.\n"
+                
+            if len(anomaly_types) == 0:
+                 narrative += "1. **Anomalous Activity**: Deviations detected from standard behavior profiles.\n"
+                 narrative += "   - *Suggestion*: Investigate the anomaly source IPs manually.\n"
+
         else:
             narrative += "## Executive Summary\n"
             narrative += "The clustering engine analyzed the semantic properties of the provided payloads and found **no critical anomalies** or deviations from established baselines.\n\n"

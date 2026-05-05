@@ -11,7 +11,8 @@ class EvidenceAnalyzer:
         self.high_value_keywords = [
             "login", "auth", "failed", "admin", "root", "sql", "injection",
             "exfil", "download", "delete", "drop", "password", "shadow", "passwd",
-            "privilege", "bypass", "unauthorized", "anomaly", "beacon"
+            "privilege", "bypass", "unauthorized", "anomaly", "beacon",
+            "ransomware", "encrypt", "shell", "upload", "evasion", "stuffing", "travel"
         ]
         
     def calculate_forensic_value(self, entry: Dict[str, Any]) -> int:
