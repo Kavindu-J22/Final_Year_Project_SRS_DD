@@ -15,12 +15,17 @@ from cryptography.hazmat.primitives.asymmetric import rsa, padding
 import hashlib, json, os, logging, sys, asyncio
 from datetime import datetime
 
-# Import MerkleTree
+# Import MerkleTree and ML Analyzer
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
 try:
     from core.merkle import MerkleTree
 except ImportError:
     MerkleTree = None
+
+try:
+    from ml_evidence import evidence_analyzer
+except ImportError:
+    evidence_analyzer = None
 
 logger = logging.getLogger("evidence_preservation")
 
@@ -47,6 +52,7 @@ class EvidenceBlock(BaseModel):
     current_hash: str
     previous_hash: str
     signature: str
+    ml_insights: Optional[Dict[str, Any]] = None
 
 class PreservationResponse(BaseModel):
     status: str
@@ -247,10 +253,16 @@ async def preserve_batch(request: BatchPreserveRequest):
     current_hash = calculate_hash(canonical_data, previous_hash)
     signature = sign_hash(current_hash)
     
+    # ML Analysis
+    ml_insights = None
+    if evidence_analyzer:
+        ml_insights = evidence_analyzer.analyze(entries_dicts)
+    
     block = EvidenceBlock(
         block_index=len(EVIDENCE_CHAIN), timestamp=timestamp,
         entries=entries_dicts, merkle_root=merkle_root,
-        current_hash=current_hash, previous_hash=previous_hash, signature=signature
+        current_hash=current_hash, previous_hash=previous_hash, signature=signature,
+        ml_insights=ml_insights
     )
     EVIDENCE_CHAIN.append(block)
     

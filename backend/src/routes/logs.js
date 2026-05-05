@@ -161,13 +161,18 @@ router.post('/ingest', protect, async (req, res) => {
     await evidenceService.preserveEvidence({
        log_id: log.logId,
        timestamp: log.timestamp.toISOString(),
-       ip_address: log.ipAddress,
-       method: log.method,
-       url: log.url,
-       status_code: log.statusCode,
-       hash: sha256Hash
+       event_type: log.eventType || 'LogIngestion',
+       user_id: log.userId || log.ipAddress || 'system',
+       action: `Method ${log.method} on ${log.url}`,
+       metadata: {
+         ip_address: log.ipAddress,
+         method: log.method,
+         url: log.url,
+         status_code: log.statusCode,
+         hash: sha256Hash
+       }
     });
-  } catch (err) { /* service offline */ }
+  } catch (err) { console.error("Evidence Preservation Error:", err.message); }
 
   res.status(201).json({ success: true, data: log, alerts, identity: identityAlerts });
 });
