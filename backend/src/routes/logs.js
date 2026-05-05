@@ -7,6 +7,57 @@ const { computeSHA256, generateAnalysisId, generateLogId } = require('../utils/h
 
 const router = express.Router();
 
+// ── In-Memory Stateful Session Tracker ────────────────────────────────────────
+const activeSessions = new Map();
+
+function getGeoLocation(ip) {
+    if (!ip) return 'Unknown';
+    if (ip.startsWith('175.')) return 'North Korea';
+    if (ip.startsWith('185.')) return 'Russia';
+    if (ip.startsWith('45.')) return 'USA';
+    if (ip.startsWith('82.')) return 'UK';
+    return 'USA'; // Default benign
+}
+
+function updateSessionContext(body) {
+    const userId = body.userId || body.ipAddress || 'unknown';
+    // Use the simulated timestamp if provided, else real time
+    const now = body.timestamp ? new Date(body.timestamp) : new Date();
+    
+    if (!activeSessions.has(userId)) {
+        activeSessions.set(userId, {
+            startTime: now.getTime(),
+            eventCount: 0,
+            ips: new Set(),
+            fileAccesses: 0,
+            lastGeo: getGeoLocation(body.ipAddress)
+        });
+    }
+    
+    const session = activeSessions.get(userId);
+    session.eventCount += 1;
+    if (body.ipAddress) session.ips.add(body.ipAddress);
+    if (body.url?.includes('/files')) session.fileAccesses += 1;
+    session.lastGeo = getGeoLocation(body.ipAddress);
+    
+    const durationSec = Math.max(0.5, (now.getTime() - session.startTime) / 1000);
+    const requestVelocity = session.eventCount / durationSec;
+    const fileAccessRatio = session.fileAccesses / session.eventCount;
+    
+    return {
+        user_id: userId,
+        hour_of_day: now.getHours(),
+        duration_sec: durationSec,
+        event_count: session.eventCount,
+        distinct_ips: session.ips.size,
+        file_access_ratio: fileAccessRatio,
+        is_weekend: [0, 6].includes(now.getDay()) ? 1 : 0,
+        geographic_location: session.lastGeo,
+        request_velocity: parseFloat(requestVelocity.toFixed(4))
+    };
+}
+
+
 // ── GET /api/logs ─────────────────────────────────────────────────────────────
 router.get('/', protect, async (req, res) => {
   const { page = 1, limit = 50, isAnomaly, riskLevel, ipAddress, startDate, endDate } = req.query;
@@ -51,20 +102,11 @@ router.post('/ingest', protect, async (req, res) => {
     alerts = result.alerts || [];
   } catch { /* service offline – continue without alerts */ }
 
-  // Component 1: Identity Profiling (Simulated Session)
+  // Component 1: Identity Profiling (Stateful Session)
   let identityAlerts = null;
   try {
-    const session = {
-        user_id: body.userId || body.ipAddress || 'unknown',
-        hour_of_day: new Date().getHours(),
-        duration_sec: 120, 
-        event_count: 50,
-        distinct_ips: 1,
-        file_access_ratio: body.url?.includes('/files') ? 1.0 : 0.0,
-        is_weekend: [0, 6].includes(new Date().getDay()) ? 1 : 0,
-        geographic_location: "Unknown"
-    };
-    identityAlerts = await identityService.analyzeSession(session);
+    const sessionContext = updateSessionContext(body);
+    identityAlerts = await identityService.analyzeSession(sessionContext);
   } catch (err) { /* service offline */ }
 
   const sha256Hash = computeSHA256(body);

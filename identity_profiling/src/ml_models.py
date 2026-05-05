@@ -220,7 +220,7 @@ class EnsembleDetector:
     Ensemble of all three models with voting.
     """
     
-    def __init__(self, input_dim: int = 7):
+    def __init__(self, input_dim: int = 8):
         self.iforest = IsolationForestModel()
         self.ocsvm = OneClassSVMModel()
         self.autoencoder = AutoencoderModel(input_dim)
@@ -283,7 +283,7 @@ class WeightedEnsembleDetector(EnsembleDetector):
     Replaces simple majority voting.
     """
     
-    def __init__(self, input_dim: int = 7):
+    def __init__(self, input_dim: int = 8):
         super().__init__(input_dim)
         # Weights can be adjusted based on validation performance
         self.weights = {'iforest': 0.35, 'ocsvm': 0.30, 'autoencoder': 0.35}
@@ -333,11 +333,11 @@ class WeightedEnsembleDetector(EnsembleDetector):
 
 if __name__ == "__main__":
     np.random.seed(42)
-    X_train = np.random.randn(1000, 7)
-    X_test = np.random.randn(100, 7)
-    X_test[0] = [10, 10, 10, 10, 10, 10, 10]
+    X_train = np.random.randn(1000, 8)
+    X_test = np.random.randn(100, 8)
+    X_test[0] = [10, 10, 10, 10, 10, 10, 10, 10]
     
-    ensemble = WeightedEnsembleDetector(input_dim=7)
+    ensemble = WeightedEnsembleDetector(input_dim=8)
     ensemble.fit(X_train)
     
     preds = ensemble.predict(X_test)

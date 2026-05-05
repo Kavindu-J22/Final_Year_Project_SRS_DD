@@ -49,6 +49,7 @@ class SessionData(BaseModel):
     file_access_ratio: float = Field(..., ge=0.0, le=1.0)
     is_weekend: int        = Field(..., ge=0, le=1)
     geographic_location: str = "Unknown"
+    request_velocity: float  = Field(0.0, ge=0.0) # Events per second
 
 class AnalysisResponse(BaseModel):
     user_id: str
@@ -73,7 +74,7 @@ def _geo_score(location: str) -> float:
     return 0.5
 
 def _to_feature_vector(s: SessionData) -> np.ndarray:
-    """Map API request to 7-dimensional feature vector."""
+    """Map API request to 8-dimensional feature vector."""
     return np.array([[
         s.hour_of_day,
         s.duration_sec / 3600.0,   # normalise to hours
@@ -82,6 +83,7 @@ def _to_feature_vector(s: SessionData) -> np.ndarray:
         s.file_access_ratio,
         float(s.is_weekend),
         _geo_score(s.geographic_location),
+        s.request_velocity         # events per second
     ]])
 
 def _risk_level(score: float) -> str:
@@ -133,7 +135,11 @@ def _make_training_data(n_normal: int = 3000) -> np.ndarray:
     geo = np.where(rng.random(n) < 0.92, 0.0,
                    rng.uniform(0.1, 0.4, n))
 
-    return np.column_stack([hours, duration, events, ips, file_ratio, weekend, geo])
+    # request_velocity: events per second (normal human: < 0.5)
+    # Using clipped exponential: mean ≈ 0.1, max ≈ 2.0
+    velocity = np.clip(rng.exponential(0.1, n), 0.01, 2.0)
+
+    return np.column_stack([hours, duration, events, ips, file_ratio, weekend, geo, velocity])
 
 # ── Model loading / training ──────────────────────────────────────────────────
 def _load_or_train():
@@ -149,7 +155,7 @@ def _load_or_train():
 
     # Try loading pre-trained models
     try:
-        ens = WeightedEnsembleDetector(input_dim=7)
+        ens = WeightedEnsembleDetector(input_dim=8)
         ens.load(MODEL_DIR)
         ENSEMBLE = ens
         MODELS_LOADED = True
@@ -161,7 +167,7 @@ def _load_or_train():
     # Fall back: train fresh ensemble on synthetic data
     try:
         X = _make_training_data()
-        ens = WeightedEnsembleDetector(input_dim=7)
+        ens = WeightedEnsembleDetector(input_dim=8)
         ens.fit(X)
         os.makedirs(MODEL_DIR, exist_ok=True)
         ens.save(MODEL_DIR)
@@ -223,7 +229,7 @@ async def analyze(session: SessionData):
         models_used = "weighted_ensemble"
         
         contributions = ENSEMBLE.get_feature_contributions(X)[0]
-        feature_names = ["hour_of_day", "duration_sec", "event_count", "distinct_ips", "file_access_ratio", "is_weekend", "geographic_location"]
+        feature_names = ["hour_of_day", "duration_sec", "event_count", "distinct_ips", "file_access_ratio", "is_weekend", "geographic_location", "request_velocity"]
         contribution_factors = {name: round(float(val), 4) for name, val in zip(feature_names, contributions)}
     else:
         # Heuristic fallback (models completely unavailable)

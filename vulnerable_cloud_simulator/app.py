@@ -15,15 +15,18 @@ def forward_log(event_type, method, path, status, payload=""):
         # Default behavior for unauthenticated requests during simulation
         pass
         
+    spoofed_ip = request.headers.get("X-Forwarded-For") or request.args.get("ip") or request.remote_addr
+    spoofed_time = request.args.get("time") or datetime.datetime.utcnow().isoformat() + "Z"
+    
     log = {
         "logId": f"sim_{uuid.uuid4().hex[:8]}",
-        "timestamp": datetime.datetime.utcnow().isoformat() + "Z",
+        "timestamp": spoofed_time,
         "eventType": event_type,
         "method": method,
         "url": path + (f"?payload={payload}" if payload else ""),
         "statusCode": status,
-        "userId": request.remote_addr,
-        "ipAddress": request.remote_addr,
+        "userId": spoofed_ip,
+        "ipAddress": spoofed_ip,
         "userAgent": "VulnerableCloudSimulator/1.0",
         "metadata": {"simulated": True}
     }
