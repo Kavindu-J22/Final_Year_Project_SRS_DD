@@ -119,7 +119,13 @@ def check_brute_force(events: List[LogEvent]) -> Optional[IncidentAlert]:
             mitre_technique="T1110 - Brute Force", affected_user=failed_logins[0].user_id,
             source_events=[e.event_id for e in failed_logins],
             timestamp=datetime.utcnow().isoformat(),
-            recommendations=["Lock affected account", "Investigate source IP", "Enable MFA"]
+            recommendations=["Lock affected account", "Investigate source IP", "Enable MFA"],
+            kill_chain_stage="Reconnaissance",
+            kill_chain_progress=["Reconnaissance"],
+            threat_forecast=[
+                {"stage": "Initial Access", "probability": 85.0},
+                {"stage": "Execution & Persistence", "probability": 15.0}
+            ]
         )
     return None
 

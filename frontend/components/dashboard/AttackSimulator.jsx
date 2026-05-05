@@ -88,11 +88,14 @@ export default function AttackSimulator({ onAttackComplete }) {
     addLog('Initiating Advanced Persistent Threat (APT) sequence...');
 
     try {
+      const attackerIp = `203.0.113.${Math.floor(Math.random() * 200) + 10}`;
+      const targetUser = `admin_${Math.floor(Math.random() * 900) + 100}`;
+      
       // Stage 1: Reconnaissance (Brute Force)
-      addLog('[Stage 1] Brute forcing credentials...');
+      addLog(`[Stage 1] Brute forcing credentials for ${targetUser} from ${attackerIp}...`);
       for (let i = 0; i < 5; i++) {
-        await axios.post(`http://localhost:5004/login?ip=203.0.113.44`, 
-          { username: 'admin', password: `pass${i}` }, { headers: getHeaders() }).catch(() => {});
+        await axios.post(`http://localhost:5004/login?ip=${attackerIp}`, 
+          { username: targetUser, password: `pass${i}` }, { headers: getHeaders() }).catch(() => {});
       }
       addLog('[Stage 1] Brute force triggered. AI Forecast predicting next move...');
       
@@ -101,8 +104,8 @@ export default function AttackSimulator({ onAttackComplete }) {
       
       // Stage 2: Initial Access (Successful Login)
       addLog('[Stage 2] Executing successful login (Initial Access)...');
-      await axios.post(`http://localhost:5004/login?ip=203.0.113.44`, 
-          { username: 'admin', password: `admin` }, { headers: getHeaders() }).catch(() => {});
+      await axios.post(`http://localhost:5004/login?ip=${attackerIp}`, 
+          { username: targetUser, password: `admin` }, { headers: getHeaders() }).catch(() => {});
       addLog('[Stage 2] Initial Access achieved. AI will recalculate forecast...');
       
       // Pause
@@ -110,7 +113,7 @@ export default function AttackSimulator({ onAttackComplete }) {
       
       // Stage 3: Privilege/Exfiltration
       addLog('[Stage 3] Accessing confidential files (Exfiltration)...');
-      await axios.get(`http://localhost:5004/files?path=passwords.txt&ip=203.0.113.44`, { headers: getHeaders() }).catch(() => {});
+      await axios.get(`http://localhost:5004/files?path=passwords.txt&ip=${attackerIp}`, { headers: getHeaders() }).catch(() => {});
       addLog('[Stage 3] Exfiltration complete.');
       
     } catch (err) {}
