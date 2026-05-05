@@ -1,8 +1,8 @@
 'use client';
 import { useState, useCallback, useEffect } from 'react';
-import { Clock, Search, RefreshCw, AlertCircle, BarChart2, Activity, Download } from 'lucide-react';
+import { Clock, Search, RefreshCw, AlertCircle, BarChart2, Activity, Download, Database, ChevronDown, ChevronUp, FileText } from 'lucide-react';
 import Navbar from '@/components/layout/Navbar';
-import { forensicsAPI } from '@/lib/api';
+import { forensicsAPI, logsAPI } from '@/lib/api';
 
 const SAMPLE_LOGS = [
   { log_id:'l1', timestamp:'2026-01-05T14:00:00Z', ip_address:'192.168.1.10', method:'GET',  url:'/index.html',              status_code:200 },
@@ -13,26 +13,29 @@ const SAMPLE_LOGS = [
 ];
 
 export default function TimelinePage() {
-  const [logs,      setLogs]      = useState('');
+  const [activeTab, setActiveTab] = useState('system'); // 'system' or 'sandbox'
+  
+  const [sandboxLogs, setSandboxLogs] = useState('');
   const [metrics,   setMetrics]   = useState(null);
   const [clusters,  setClusters]  = useState([]);
+  
   const [searchTerm,setSearchTerm]= useState('');
   const [searchField,setSearchField]= useState('ip_address');
   const [searchRes, setSearchRes] = useState(null);
+  
   const [running,   setRunning]   = useState(false);
   const [searching, setSearching] = useState(false);
   const [error,     setError]     = useState('');
+  
   const [report,    setReport]    = useState(null);
+  const [reportOpen, setReportOpen] = useState(true);
 
-  const runAnalysis = useCallback(async () => {
-    setRunning(true); setError('');
+  // Run Analysis logic
+  const runAnalysis = useCallback(async (logsToAnalyze) => {
+    setRunning(true); setError(''); setReport(null); setClusters([]); setMetrics(null);
     try {
-      let parsed;
-      try { parsed = JSON.parse(logs); } catch { parsed = SAMPLE_LOGS; }
-      if (!Array.isArray(parsed)) parsed = SAMPLE_LOGS;
-
       const [analyzeRes, metricsRes] = await Promise.allSettled([
-        forensicsAPI.analyzeTimeline(parsed),
+        forensicsAPI.analyzeTimeline(logsToAnalyze),
         forensicsAPI.getTimelineMetrics(),
       ]);
       if (analyzeRes.status === 'fulfilled') {
@@ -45,7 +48,45 @@ export default function TimelinePage() {
       }
     } catch (e) { setError(e.message); }
     finally { setRunning(false); }
-  }, [logs]);
+  }, []);
+
+  const runSystemAnalysis = useCallback(async () => {
+    setRunning(true); setError('');
+    try {
+      // Fetch system logs
+      const { data } = await logsAPI.getAll({ limit: 150 });
+      const systemLogs = data.data || [];
+      
+      if (systemLogs.length === 0) {
+        setError('No system logs found to analyze.');
+        setRunning(false);
+        return;
+      }
+      
+      // Map MongoDB logs to the format expected by the ML engine
+      const mappedLogs = systemLogs.map(log => ({
+        log_id: log.logId || log._id,
+        timestamp: log.timestamp,
+        ip_address: log.ipAddress || 'unknown',
+        method: log.method || 'GET',
+        url: log.url || '/',
+        status_code: log.statusCode || 200,
+        user_agent: log.userAgent || 'unknown',
+      }));
+      
+      await runAnalysis(mappedLogs);
+    } catch (e) { 
+      setError(e.message); 
+      setRunning(false); 
+    }
+  }, [runAnalysis]);
+
+  const runSandboxAnalysis = useCallback(async () => {
+    let parsed;
+    try { parsed = JSON.parse(sandboxLogs); } catch { parsed = SAMPLE_LOGS; }
+    if (!Array.isArray(parsed)) parsed = SAMPLE_LOGS;
+    await runAnalysis(parsed);
+  }, [sandboxLogs, runAnalysis]);
 
   const runSearch = useCallback(async () => {
     if (!searchTerm.trim()) return;
@@ -57,7 +98,7 @@ export default function TimelinePage() {
     finally { setSearching(false); }
   }, [searchTerm, searchField]);
 
-  const loadSample = () => setLogs(JSON.stringify(SAMPLE_LOGS, null, 2));
+  const loadSample = () => setSandboxLogs(JSON.stringify(SAMPLE_LOGS, null, 2));
 
   const downloadReport = () => {
     if (!report) return;
@@ -70,33 +111,17 @@ export default function TimelinePage() {
     URL.revokeObjectURL(url);
   };
 
-  // Auto-load + analyze on first mount so the page isn't blank
+  // Auto-run system analysis on mount if system tab is active
   useEffect(() => {
-    const autoRun = async () => {
-      setRunning(true); setError('');
-      try {
-        const [analyzeRes, metricsRes] = await Promise.allSettled([
-          forensicsAPI.analyzeTimeline(SAMPLE_LOGS),
-          forensicsAPI.getTimelineMetrics(),
-        ]);
-        if (analyzeRes.status === 'fulfilled') {
-          const d = analyzeRes.value.data?.data ?? analyzeRes.value.data;
-          setClusters(d?.clusters ?? []);
-          setReport(d?.report ?? null);
-        }
-        if (metricsRes.status === 'fulfilled') {
-          setMetrics(metricsRes.value.data?.data ?? metricsRes.value.data);
-        }
-      } catch { /* ignore — user can run manually */ }
-      finally { setRunning(false); }
-    };
-    autoRun();
+    if (activeTab === 'system') {
+      runSystemAnalysis();
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [activeTab]);
 
   return (
     <div className="flex flex-col min-h-screen">
-      <Navbar title="Forensic Timeline Sandbox" subtitle="DBSCAN Clustering · TF-IDF Entity Search" />
+      <Navbar title="Forensic Timeline ML" subtitle="DBSCAN Clustering · Semantic Log Analysis" />
       <div className="flex-1 p-6 space-y-6">
 
         {error && (
@@ -105,37 +130,168 @@ export default function TimelinePage() {
           </div>
         )}
 
-        {/* Log Input */}
-        <div className="glass-card p-5 space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Clock className="w-4 h-4 text-cyan-400" />
-              <h2 className="text-sm font-semibold text-slate-200">Log Input (JSON Array)</h2>
-            </div>
-            <button onClick={loadSample} className="text-[10px] text-slate-500 hover:text-cyan-400 border border-slate-700/60 px-2 py-1 rounded transition-all">
-              Load Sample
-            </button>
-          </div>
-          <textarea
-            value={logs}
-            onChange={(e) => setLogs(e.target.value)}
-            placeholder='Paste JSON log array here, or click "Load Sample"…'
-            rows={7}
-            className="w-full bg-slate-900/60 border border-slate-700/60 rounded-lg px-3 py-2 text-xs font-mono text-slate-300 placeholder-slate-600 focus:outline-none focus:border-cyan-500/50 resize-y"
-          />
-          <div className="flex items-center gap-3">
-            <button onClick={runAnalysis} disabled={running} className="btn-primary flex items-center gap-2">
-              {running ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Activity className="w-4 h-4" />}
-              {running ? 'Analysing…' : 'Run Timeline Analysis'}
-            </button>
-            {report && (
-              <button onClick={downloadReport} className="flex items-center gap-2 border border-slate-700 bg-slate-900/60 hover:bg-slate-800 px-3 py-2 rounded-lg text-sm transition-colors text-slate-300">
-                <Download className="w-4 h-4 text-emerald-400" />
-                Download Forensic Report (Markdown)
+        {/* Tabs */}
+        <div className="flex gap-1 border-b border-slate-800/60">
+          <button
+            onClick={() => setActiveTab('system')}
+            className={`px-4 py-2 text-sm font-medium transition-all border-b-2 -mb-px flex items-center gap-2 ${
+              activeTab === 'system' ? 'border-cyan-500 text-cyan-400' : 'border-transparent text-slate-500 hover:text-slate-300'
+            }`}
+          >
+            <Database className="w-4 h-4" /> System Timeline (Live Logs)
+          </button>
+          <button
+            onClick={() => setActiveTab('sandbox')}
+            className={`px-4 py-2 text-sm font-medium transition-all border-b-2 -mb-px flex items-center gap-2 ${
+              activeTab === 'sandbox' ? 'border-amber-500 text-amber-400' : 'border-transparent text-slate-500 hover:text-slate-300'
+            }`}
+          >
+            <Clock className="w-4 h-4" /> Sandbox Mode (Manual Input)
+          </button>
+        </div>
+
+        {/* Tab Content */}
+        {activeTab === 'sandbox' && (
+          <div className="glass-card p-5 space-y-3 border-amber-500/20 bg-amber-900/5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Clock className="w-4 h-4 text-amber-400" />
+                <h2 className="text-sm font-semibold text-slate-200">Log Input (JSON Array)</h2>
+              </div>
+              <button onClick={loadSample} className="text-[10px] text-slate-500 hover:text-amber-400 border border-slate-700/60 px-2 py-1 rounded transition-all">
+                Load Sample
               </button>
+            </div>
+            <textarea
+              value={sandboxLogs}
+              onChange={(e) => setSandboxLogs(e.target.value)}
+              placeholder='Paste JSON log array here, or click "Load Sample"…'
+              rows={7}
+              className="w-full bg-slate-900/60 border border-slate-700/60 rounded-lg px-3 py-2 text-xs font-mono text-slate-300 placeholder-slate-600 focus:outline-none focus:border-amber-500/50 resize-y"
+            />
+            <div className="flex items-center gap-3">
+              <button onClick={runSandboxAnalysis} disabled={running} className="btn-primary bg-amber-600 hover:bg-amber-500 shadow-[0_0_15px_rgba(217,119,6,0.3)] flex items-center gap-2">
+                {running ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Activity className="w-4 h-4" />}
+                {running ? 'Analysing Sandbox…' : 'Run Timeline Analysis'}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'system' && (
+          <div className="glass-card p-5 space-y-3 border-cyan-500/20 bg-cyan-900/5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Database className="w-4 h-4 text-cyan-400" />
+                <h2 className="text-sm font-semibold text-slate-200">Live System Log Analysis</h2>
+              </div>
+              <button onClick={runSystemAnalysis} disabled={running} className="btn-primary flex items-center gap-2">
+                {running ? <RefreshCw className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+                {running ? 'Fetching & Analysing…' : 'Refresh System Timeline'}
+              </button>
+            </div>
+            <p className="text-xs text-slate-400">
+              The AI Timeline Engine automatically pulls the most recent logs from the system database, normalizes them, and runs DBSCAN density-based clustering to map the entire attack timeline.
+            </p>
+          </div>
+        )}
+
+        {/* Metrics + Clusters */}
+        {(metrics || clusters.length > 0) && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+            {metrics && (
+              <div className="glass-card p-5 space-y-4">
+                <div className="flex items-center gap-2">
+                  <BarChart2 className="w-4 h-4 text-indigo-400" />
+                  <h2 className="text-sm font-semibold text-slate-200">Analysis Metrics</h2>
+                </div>
+                <div className="grid grid-cols-2 gap-3 text-xs">
+                  {[
+                    { label:'Total Logs',   value: metrics.total_logs },
+                    { label:'Anomalies',    value: metrics.total_anomalies },
+                    { label:'Clusters',     value: metrics.num_clusters },
+                    { label:'Noise Ratio',  value: `${((metrics.noise_ratio??0)*100).toFixed(1)}%` },
+                  ].map(({ label, value }) => (
+                    <div key={label} className="p-3 rounded-lg bg-slate-900/60 border border-slate-800/60">
+                      <p className="text-slate-500 text-[10px] uppercase">{label}</p>
+                      <p className="text-slate-200 font-bold text-base mt-0.5">{value ?? '—'}</p>
+                    </div>
+                  ))}
+                </div>
+                {metrics.top_ips?.length > 0 && (
+                  <div>
+                    <p className="text-[10px] uppercase text-slate-600 mb-2">Top Source IPs</p>
+                    {metrics.top_ips.slice(0, 5).map((ip) => (
+                      <div key={ip.ip} className="flex items-center gap-2 mb-1">
+                        <span className="font-mono text-[11px] text-slate-400 w-36 truncate">{ip.ip}</span>
+                        <div className="flex-1 h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                          <div className="h-full bg-indigo-500 rounded-full" style={{ width: `${Math.min(100, (ip.count / (metrics.total_logs||1)) * 100)}%` }} />
+                        </div>
+                        <span className="text-[10px] text-slate-500 w-6 text-right">{ip.count}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {clusters.length > 0 && (
+              <div className="glass-card p-5 space-y-3">
+                <div className="flex items-center gap-2">
+                  <Activity className="w-4 h-4 text-cyan-400" />
+                  <h2 className="text-sm font-semibold text-slate-200">DBSCAN Clusters</h2>
+                </div>
+                <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+                  {clusters.map((c) => (
+                    <div key={c.cluster_id} className={`p-3 rounded-lg border text-xs ${c.is_anomaly ? 'bg-red-500/5 border-red-500/20' : 'bg-slate-900/40 border-slate-800/60'}`}>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="font-medium text-slate-200">{c.label}</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-slate-500">{c.size} logs</span>
+                          {c.is_anomaly && <span className="text-[10px] bg-red-500/20 text-red-400 border border-red-500/30 px-1.5 py-0.5 rounded font-bold">ANOMALY</span>}
+                        </div>
+                      </div>
+                      <p className="text-slate-600 font-mono truncate">{(c.representative_logs ?? []).slice(0,2).join(' · ')}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
             )}
           </div>
-        </div>
+        )}
+
+        {/* AI Predicted Result (On-Site Markdown Report) */}
+        {report && (
+          <div className="glass-card overflow-hidden transition-all duration-300">
+            <div 
+              className="p-4 flex items-center justify-between cursor-pointer bg-slate-800/30 hover:bg-slate-800/50"
+              onClick={() => setReportOpen(!reportOpen)}
+            >
+              <div className="flex items-center gap-2">
+                <FileText className="w-5 h-5 text-emerald-400" />
+                <h2 className="text-md font-bold text-emerald-100">AI Predicted Result (Forensic Report)</h2>
+              </div>
+              <div className="flex items-center gap-3">
+                <button 
+                  onClick={(e) => { e.stopPropagation(); downloadReport(); }} 
+                  className="flex items-center gap-2 border border-slate-700 bg-slate-900/60 hover:bg-slate-800 px-3 py-1.5 rounded-lg text-xs transition-colors text-slate-300"
+                >
+                  <Download className="w-3.5 h-3.5 text-emerald-400" /> Download
+                </button>
+                {reportOpen ? <ChevronUp className="w-5 h-5 text-slate-500" /> : <ChevronDown className="w-5 h-5 text-slate-500" />}
+              </div>
+            </div>
+            
+            {reportOpen && (
+              <div className="p-5 border-t border-slate-800/60 bg-[#0f172a]/80">
+                <pre className="text-xs font-mono text-slate-300 whitespace-pre-wrap overflow-x-auto p-4 rounded-lg bg-black/40 border border-slate-800 custom-scrollbar leading-relaxed">
+                  {report}
+                </pre>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Entity Search */}
         <div className="glass-card p-5 space-y-3">
@@ -177,73 +333,7 @@ export default function TimelinePage() {
           )}
         </div>
 
-        {/* Metrics + Clusters */}
-        {(metrics || clusters.length > 0) && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-
-            {metrics && (
-              <div className="glass-card p-5 space-y-4">
-                <div className="flex items-center gap-2">
-                  <BarChart2 className="w-4 h-4 text-amber-400" />
-                  <h2 className="text-sm font-semibold text-slate-200">Analysis Metrics</h2>
-                </div>
-                <div className="grid grid-cols-2 gap-3 text-xs">
-                  {[
-                    { label:'Total Logs',   value: metrics.total_logs },
-                    { label:'Anomalies',    value: metrics.total_anomalies },
-                    { label:'Clusters',     value: metrics.num_clusters },
-                    { label:'Noise Ratio',  value: `${((metrics.noise_ratio??0)*100).toFixed(1)}%` },
-                  ].map(({ label, value }) => (
-                    <div key={label} className="p-3 rounded-lg bg-slate-900/60 border border-slate-800/60">
-                      <p className="text-slate-500 text-[10px] uppercase">{label}</p>
-                      <p className="text-slate-200 font-bold text-base mt-0.5">{value ?? '—'}</p>
-                    </div>
-                  ))}
-                </div>
-                {metrics.top_ips?.length > 0 && (
-                  <div>
-                    <p className="text-[10px] uppercase text-slate-600 mb-2">Top Source IPs</p>
-                    {metrics.top_ips.slice(0, 5).map((ip) => (
-                      <div key={ip.ip} className="flex items-center gap-2 mb-1">
-                        <span className="font-mono text-[11px] text-slate-400 w-36 truncate">{ip.ip}</span>
-                        <div className="flex-1 h-1.5 bg-slate-800 rounded-full overflow-hidden">
-                          <div className="h-full bg-cyan-500 rounded-full" style={{ width: `${Math.min(100, (ip.count / (metrics.total_logs||1)) * 100)}%` }} />
-                        </div>
-                        <span className="text-[10px] text-slate-500 w-6 text-right">{ip.count}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {clusters.length > 0 && (
-              <div className="glass-card p-5 space-y-3">
-                <div className="flex items-center gap-2">
-                  <Activity className="w-4 h-4 text-cyan-400" />
-                  <h2 className="text-sm font-semibold text-slate-200">DBSCAN Clusters</h2>
-                </div>
-                <div className="space-y-2">
-                  {clusters.map((c) => (
-                    <div key={c.cluster_id} className={`p-3 rounded-lg border text-xs ${c.is_anomaly ? 'bg-red-500/5 border-red-500/20' : 'bg-slate-900/40 border-slate-800/60'}`}>
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="font-medium text-slate-200">{c.label}</span>
-                        <div className="flex items-center gap-2">
-                          <span className="text-slate-500">{c.size} logs</span>
-                          {c.is_anomaly && <span className="text-[10px] bg-red-500/20 text-red-400 border border-red-500/30 px-1.5 py-0.5 rounded font-bold">ANOMALY</span>}
-                        </div>
-                      </div>
-                      <p className="text-slate-600 font-mono truncate">{(c.representative_logs ?? []).slice(0,2).join(' · ')}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
       </div>
     </div>
   );
 }
-
