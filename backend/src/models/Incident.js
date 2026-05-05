@@ -15,6 +15,10 @@ const incidentSchema = new mongoose.Schema(
     sourceEvents:        [{ type: String }],
     recommendations:     [{ type: String }],
 
+    killChainStage:      { type: String },
+    killChainProgress:   [{ type: String }],
+    threatForecast:      [{ type: mongoose.Schema.Types.Mixed }],
+
     // ── Lifecycle ─────────────────────────────────────────────────────────────
     status: {
       type: String,

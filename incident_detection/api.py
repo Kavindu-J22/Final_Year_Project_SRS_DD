@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field
 from typing import List, Dict, Optional, Any
 from datetime import datetime
 from collections import deque
-import yaml, os, json, sys
+import yaml, os, json, sys, uuid
 
 # Import KillChainCorrelator
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
@@ -49,6 +49,7 @@ class IncidentAlert(BaseModel):
     recommendations: List[str]
     kill_chain_stage: Optional[str] = None
     kill_chain_progress: Optional[List[str]] = None
+    threat_forecast: Optional[List[Dict[str, Any]]] = None
 
 class RuleInfo(BaseModel):
     rule_id: str
@@ -111,10 +112,8 @@ def get_default_rules():
 def check_brute_force(events: List[LogEvent]) -> Optional[IncidentAlert]:
     failed_logins = [e for e in events if e.event_type == "FailedLogin"]
     if len(failed_logins) >= 5:
-        global INCIDENT_COUNTER
-        INCIDENT_COUNTER += 1
         return IncidentAlert(
-            alert_id=f"INC-{INCIDENT_COUNTER:05d}", severity="CRITICAL",
+            alert_id=f"INC-{uuid.uuid4().hex[:8]}", severity="CRITICAL",
             title="Brute Force Attack Detected",
             description=f"Detected {len(failed_logins)} failed login attempts",
             mitre_technique="T1110 - Brute Force", affected_user=failed_logins[0].user_id,
@@ -134,10 +133,8 @@ def check_insider_threat(events: List[LogEvent]) -> Optional[IncidentAlert]:
         except:
             pass
     if len(suspicious) >= 3:
-        global INCIDENT_COUNTER
-        INCIDENT_COUNTER += 1
         return IncidentAlert(
-            alert_id=f"INC-{INCIDENT_COUNTER:05d}", severity="HIGH",
+            alert_id=f"INC-{uuid.uuid4().hex[:8]}", severity="HIGH",
             title="Potential Insider Threat",
             description=f"Detected {len(suspicious)} suspicious off-hours file access events",
             mitre_technique="T1078 - Valid Accounts", affected_user=suspicious[0].user_id,
@@ -180,9 +177,8 @@ async def ingest_event(event: LogEvent):
     if correlator_engine:
         corr_alerts = correlator_engine.process_event(to_normalized(event))
         for ca in corr_alerts:
-            INCIDENT_COUNTER += 1
             alert = IncidentAlert(
-                alert_id=f"INC-{INCIDENT_COUNTER:05d}",
+                alert_id=f"INC-{uuid.uuid4().hex[:8]}",
                 severity=ca.severity,
                 title=ca.pattern_name,
                 description=ca.description,
@@ -192,7 +188,8 @@ async def ingest_event(event: LogEvent):
                 timestamp=ca.timestamp,
                 recommendations=["Investigate immediately", "Review related logs"],
                 kill_chain_stage=ca.kill_chain_stage,
-                kill_chain_progress=ca.kill_chain_progress
+                kill_chain_progress=ca.kill_chain_progress,
+                threat_forecast=ca.threat_forecast
             )
             alerts.append(alert)
             RECENT_INCIDENTS.append(alert)
@@ -219,9 +216,8 @@ async def correlate_events(request: CorrelationRequest):
         for event in request.events:
             corr_alerts = correlator_engine.process_event(to_normalized(event))
             for ca in corr_alerts:
-                INCIDENT_COUNTER += 1
                 alert = IncidentAlert(
-                    alert_id=f"INC-{INCIDENT_COUNTER:05d}",
+                    alert_id=f"INC-{uuid.uuid4().hex[:8]}",
                     severity=ca.severity,
                     title=ca.pattern_name,
                     description=ca.description,
@@ -231,7 +227,8 @@ async def correlate_events(request: CorrelationRequest):
                     timestamp=ca.timestamp,
                     recommendations=["Investigate immediately", "Review related logs"],
                     kill_chain_stage=ca.kill_chain_stage,
-                    kill_chain_progress=ca.kill_chain_progress
+                    kill_chain_progress=ca.kill_chain_progress,
+                    threat_forecast=ca.threat_forecast
                 )
                 incidents.append(alert)
                 RECENT_INCIDENTS.append(alert)

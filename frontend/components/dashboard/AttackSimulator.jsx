@@ -83,24 +83,39 @@ export default function AttackSimulator({ onAttackComplete }) {
     finishAttack();
   };
 
-  const simulateSlowDrip = async () => {
-    setIsAttacking(true); setStatus('Slow-Drip SQLi...'); setLogs([]);
-    addLog('Initiating Stealthy Slow-Drip SQLi...');
+  const simulateAPT = async () => {
+    setIsAttacking(true); setStatus('APT Kill-Chain...'); setLogs([]);
+    addLog('Initiating Advanced Persistent Threat (APT) sequence...');
 
-    const payloads = ["admin' OR 1=1--", "admin' UNION SELECT 1,2,3--"];
-
-    for (let i = 0; i < payloads.length; i++) {
-      try {
-        await axios.post(`http://localhost:5004/login?ip=82.11.22.33`, 
-          { username: payloads[i], password: 'any' }, { headers: getHeaders() });
-      } catch (err) {
-        addLog(`[UK IP] POST /login username="${payloads[i]}" -> Exploit Executed (500)`);
+    try {
+      // Stage 1: Reconnaissance (Brute Force)
+      addLog('[Stage 1] Brute forcing credentials...');
+      for (let i = 0; i < 5; i++) {
+        await axios.post(`http://localhost:5004/login?ip=203.0.113.44`, 
+          { username: 'admin', password: `pass${i}` }, { headers: getHeaders() }).catch(() => {});
       }
-      // Slow to bypass velocity detector, but triggers kill-chain
-      await new Promise(r => setTimeout(r, 1500)); 
-    }
+      addLog('[Stage 1] Brute force triggered. AI Forecast predicting next move...');
+      
+      // Pause for AI to predict
+      await new Promise(r => setTimeout(r, 4000));
+      
+      // Stage 2: Initial Access (Successful Login)
+      addLog('[Stage 2] Executing successful login (Initial Access)...');
+      await axios.post(`http://localhost:5004/login?ip=203.0.113.44`, 
+          { username: 'admin', password: `admin` }, { headers: getHeaders() }).catch(() => {});
+      addLog('[Stage 2] Initial Access achieved. AI will recalculate forecast...');
+      
+      // Pause
+      await new Promise(r => setTimeout(r, 4000));
+      
+      // Stage 3: Privilege/Exfiltration
+      addLog('[Stage 3] Accessing confidential files (Exfiltration)...');
+      await axios.get(`http://localhost:5004/files?path=passwords.txt&ip=203.0.113.44`, { headers: getHeaders() }).catch(() => {});
+      addLog('[Stage 3] Exfiltration complete.');
+      
+    } catch (err) {}
     
-    addLog('Stealth attack completed.');
+    addLog('APT sequence completed.');
     finishAttack();
   };
 
@@ -154,11 +169,11 @@ export default function AttackSimulator({ onAttackComplete }) {
         </button>
 
         <button 
-          onClick={simulateSlowDrip} disabled={isAttacking}
+          onClick={simulateAPT} disabled={isAttacking}
           className="flex flex-col items-center text-center gap-2 p-3 rounded-lg border border-slate-700 bg-slate-900/60 hover:bg-slate-800 hover:border-purple-500/50 transition-all disabled:opacity-50"
         >
           <Ghost className="w-5 h-5 text-purple-400" />
-          <span className="text-[11px] font-semibold text-slate-300">Slow-Drip SQLi<br/><span className="text-[9px] text-slate-500 font-normal">(Triggers Kill-Chain)</span></span>
+          <span className="text-[11px] font-semibold text-slate-300">Advanced APT<br/><span className="text-[9px] text-slate-500 font-normal">(Triggers Threat Forecast)</span></span>
         </button>
       </div>
 

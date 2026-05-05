@@ -1,6 +1,7 @@
 const express      = require('express');
 const LogEntry     = require('../models/LogEntry');
 const ClusterResult= require('../models/ClusterResult');
+const Incident     = require('../models/Incident');
 const { protect }  = require('../middleware/authMiddleware');
 const { timelineService, incidentService, identityService, evidenceService } = require('../services/mlService');
 const { computeSHA256, generateAnalysisId, generateLogId } = require('../utils/hashUtils');
@@ -100,7 +101,35 @@ router.post('/ingest', protect, async (req, res) => {
   try {
     const result = await incidentService.ingestEvent(event);
     alerts = result.alerts || [];
-  } catch { /* service offline – continue without alerts */ }
+    
+    // Save to Incident collection
+    if (alerts.length > 0) {
+      console.log(`[Incident Engine] Received ${alerts.length} alerts for event ${event.event_id}`);
+      for (const alert of alerts) {
+        console.log(`Saving alert: ${alert.alert_id} | ${alert.title}`);
+        const sha256Hash = computeSHA256(alert);
+        const saved = await Incident.findOneAndUpdate(
+          { alertId: alert.alert_id },
+          {
+            alertId:              alert.alert_id,
+            severity:             alert.severity,
+            title:                alert.title,
+            description:          alert.description,
+            mitreAttackTechnique: alert.mitre_technique,
+            affectedUser:         alert.affected_user,
+            sourceEvents:         alert.source_events,
+            recommendations:      alert.recommendations,
+            killChainStage:       alert.kill_chain_stage,
+            killChainProgress:    alert.kill_chain_progress,
+            threatForecast:       alert.threat_forecast,
+            sha256Hash,
+          },
+          { upsert: true, new: true }
+        );
+        console.log(`Successfully saved incident: ${saved._id}`);
+      }
+    }
+  } catch (err) { console.error("Incident Engine Error:", err.message); }
 
   // Component 1: Identity Profiling (Stateful Session)
   let identityAlerts = null;

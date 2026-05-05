@@ -1,5 +1,5 @@
 'use client';
-import { AlertTriangle, Clock, User, Tag, ChevronDown, ChevronUp } from 'lucide-react';
+import { AlertTriangle, Clock, User, Tag, ChevronDown, ChevronUp, BrainCircuit } from 'lucide-react';
 import { useState } from 'react';
 import clsx from 'clsx';
 
@@ -129,6 +129,35 @@ export default function IncidentCard({ incident, onStatusChange }) {
                   );
                 })}
               </div>
+            </div>
+          )}
+
+          {/* AI Threat Forecast */}
+          {(incident.threatForecast?.length > 0 || incident.threat_forecast?.length > 0) && (
+            <div className="mt-4 p-3 bg-red-900/10 border border-red-500/30 rounded-lg shadow-[0_0_15px_rgba(239,68,68,0.1)]">
+              <div className="flex items-center gap-2 mb-2">
+                <BrainCircuit className="w-4 h-4 text-red-400 animate-pulse" />
+                <span className="text-[11px] font-bold text-red-400 uppercase tracking-wider">AI Predictive Threat Forecast</span>
+              </div>
+              <div className="space-y-2 mt-3">
+                {(incident.threatForecast || incident.threat_forecast).map((forecast, idx) => (
+                  <div key={idx} className="flex items-center gap-3">
+                    <span className="text-[11px] text-slate-300 w-36 truncate font-medium">{forecast.stage}</span>
+                    <div className="flex-1 h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                      <div 
+                        className={clsx("h-full rounded-full transition-all duration-1000", forecast.probability > 70 ? "bg-red-500" : forecast.probability > 30 ? "bg-amber-500" : "bg-cyan-500")} 
+                        style={{ width: `${forecast.probability}%` }} 
+                      />
+                    </div>
+                    <span className={clsx("text-[10px] font-mono w-8 text-right", forecast.probability > 70 ? "text-red-400 font-bold" : "text-slate-400")}>{forecast.probability}%</span>
+                  </div>
+                ))}
+              </div>
+              {(incident.threatForecast || incident.threat_forecast)[0]?.probability > 70 && (
+                <p className="mt-3 text-[10px] text-red-300/80 border-l-2 border-red-500 pl-2 leading-relaxed bg-red-950/20 py-1 pr-1">
+                  High probability of progressing to <strong className="text-red-400">{(incident.threatForecast || incident.threat_forecast)[0].stage}</strong>. Immediate defensive action recommended.
+                </p>
+              )}
             </div>
           )}
 

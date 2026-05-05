@@ -19,6 +19,11 @@ from typing import Dict, List, Any, Optional
 from dataclasses import dataclass, field
 from dotenv import load_dotenv
 
+try:
+    from ml_predictor import predictor
+except ImportError:
+    predictor = None
+
 load_dotenv()
 
 try:
@@ -76,6 +81,7 @@ class CorrelationAlert:
     event_chain: List[Dict]
     kill_chain_stage: str = ""
     kill_chain_progress: List[str] = field(default_factory=list)
+    threat_forecast: List[Dict[str, Any]] = field(default_factory=list)
     timestamp: str = field(default_factory=lambda: datetime.utcnow().isoformat())
     
     # to dict
@@ -90,6 +96,7 @@ class CorrelationAlert:
             "event_chain": self.event_chain,
             "kill_chain_stage": self.kill_chain_stage,
             "kill_chain_progress": self.kill_chain_progress,
+            "threat_forecast": self.threat_forecast,
             "timestamp": self.timestamp,
             "alert_type": "correlation"
         }
@@ -443,6 +450,10 @@ class KillChainCorrelator(Correlator):
                 # Add Kill Chain Progress
                 alert.kill_chain_progress = stages_hit
                 alert.kill_chain_stage = self._get_latest_stage(stages_hit)
+                
+                # Add Threat Forecast
+                if predictor and stages_hit:
+                    alert.threat_forecast = predictor.predict_next_stages(stages_hit)
                 
                 # Contextual Severity: Escalate if multiple stages hit
                 if len(stages_hit) >= 3 and alert.severity in ["MEDIUM", "HIGH"]:
