@@ -1,8 +1,7 @@
 # ── Virtual Environment ───────────────────────────────────────────────────────
 venv/
 .venv/
-env/
-.env/
+
 
 # ── Python cache ──────────────────────────────────────────────────────────────
 __pycache__/
@@ -11,23 +10,6 @@ __pycache__/
 *.pyd
 .Python
 
-# ── Trained ML models (large binary files – regenerate via training) ──────────
-models/*.pkl
-models/*.joblib
-models/*.h5
-models/*.pt
-models/*.pth
-
-
-
-# ── Jupyter Notebooks checkpoints ────────────────────────────────────────────
-notebooks/.ipynb_checkpoints/
-.ipynb_checkpoints/
-
-# ── Environment / secrets ─────────────────────────────────────────────────────
-.env
-.env.local
-*.env
 
 # ── Logs & reports ────────────────────────────────────────────────────────────
 *.log
@@ -39,6 +21,4 @@ Thumbs.db
 .vscode/
 .idea/
 
-# ── Large Splunk binary data (exceeds GitHub 100 MB limit) ───────────────────
-data/botsv1_data_set/var/
 

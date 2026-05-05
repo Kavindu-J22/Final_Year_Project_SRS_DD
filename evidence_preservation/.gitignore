@@ -1,8 +1,6 @@
 # ── Virtual Environment ───────────────────────────────────────────────────────
 venv/
 .venv/
-env/
-.env/
 
 # ── Python cache ──────────────────────────────────────────────────────────────
 __pycache__/
@@ -11,18 +9,9 @@ __pycache__/
 *.pyd
 .Python
 
-# ── RSA Keys (CRITICAL – never commit private keys) ──────────────────────────
-*.pem
-*.key
-*.crt
-private_key.pem
-public_key.pem
-keys/
 
-# ── Environment / secrets ─────────────────────────────────────────────────────
-.env
-.env.local
-*.env
+
+
 
 # ── Logs & reports ────────────────────────────────────────────────────────────
 *.log
